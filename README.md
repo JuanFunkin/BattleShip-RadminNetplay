@@ -8,7 +8,7 @@
 
 **BattleShipDX** is a modified version of [**BattleShip**](https://github.com/JRickey/BattleShip) by JRickey, the PC port of **Super Smash Bros. (N64)** built on the [ssb-decomp-re](https://github.com/vetritheretri/ssb-decomp-re) decompilation with [libultraship](https://github.com/Kenix3/libultraship) and [Torch](https://github.com/HarbourMasters/Torch). It is **not** the original project: everything BattleShip does is still here, plus the extra features listed in [What BattleShipDX adds](#what-battleshipdx-adds). All credit for the port itself goes to JRickey and the upstream contributors.
 
-- A Assets Editor for the port: [**Asset Editor**](juanfunkin.github.io/BattleShipDX/)
+- A Assets Editor for the port: juanfunkin.github.io/BattleShipDX/
 - For now this version is only for **Windows**
 
 Download the high resolution texture pack from [GhostlyDark](https://github.com/GhostlyDark) [here!](https://evilgames.eu/texture-packs/ssb-reloaded.htm#pc)
