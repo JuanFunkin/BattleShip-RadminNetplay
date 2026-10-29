@@ -1,8 +1,46 @@
 diff --git a/src/ft/ftcommon/ftcommondead.c b/src/ft/ftcommon/ftcommondead.c
-index d3b6371..cf3f001 100644
+index d3b6371..b26e513 100644
 --- a/src/ft/ftcommon/ftcommondead.c
 +++ b/src/ft/ftcommon/ftcommondead.c
-@@ -108,11 +108,18 @@ void ftCommonDeadUpdateScore(FTStruct *this_fp)
+@@ -4,6 +4,10 @@
+ #include <it/itmain.h>
+ 
+ extern alSoundEffect* func_800269C0_275C0(u16);
++#ifdef PORT
++extern int port_cheat_gameplay_enabled(void);
++extern int port_cheat_infinite_stocks(void);
++#endif
+ 
+ // // // // // // // // // // // //
+ //                               //
+@@ -83,6 +87,13 @@ void ftCommonDeadUpdateScore(FTStruct *this_fp)
+     }
+     else gSCManagerBattleState->players[this_fp->player].total_selfdestructs++;
+     
++#ifdef PORT
++    if ((this_fp->pkind == nFTPlayerKindMan) && port_cheat_gameplay_enabled() && port_cheat_infinite_stocks())
++    {
++        // Infinite stocks/lives cheat: skip the stock decrement entirely.
++    }
++    else
++#endif
+     if (gSCManagerBattleState->game_rules & SCBATTLE_GAMERULE_STOCK)
+     {
+         this_fp->stock_count--;
+@@ -91,6 +102,12 @@ void ftCommonDeadUpdateScore(FTStruct *this_fp)
+ 
+         ifCommonBattleUpdateScoreStocks(this_fp);
+     }
++#ifdef PORT
++    if ((this_fp->pkind == nFTPlayerKindMan) && port_cheat_gameplay_enabled() && port_cheat_infinite_stocks())
++    {
++    }
++    else
++#endif
+     if (gSCManagerBattleState->game_rules & SCBATTLE_GAMERULE_1PGAME)
+     {
+         this_fp->stock_count--;
+@@ -108,11 +125,18 @@ void ftCommonDeadUpdateScore(FTStruct *this_fp)
           * handoff state from ever affecting solo bonus practice. */
          if (sc1PManagerIsCoopActive())
          {
@@ -25,6 +63,48 @@ index d3b6371..cf3f001 100644
              {
                  gSCManagerBattleState->players[this_fp->player].stock_count = -1;
                  return;
+diff --git a/src/ft/ftmain.c b/src/ft/ftmain.c
+index 22c73a1..8b22d1c 100644
+--- a/src/ft/ftmain.c
++++ b/src/ft/ftmain.c
+@@ -1347,6 +1347,15 @@ void ftMainRunUpdateColAnim(GObj *fighter_gobj)
+     }
+ }
+ 
++#ifdef PORT
++// UnlockCheats.cpp: local-only gameplay cheats (always false while an online room is open)
++extern int port_cheat_gameplay_enabled(void);
++extern int port_cheat_infinite_jumps(void);
++extern int port_cheat_infinite_shield(void);
++extern int port_cheat_zero_percent(void);
++extern int port_cheat_enemy_999(void);
++#endif
++
+ // 0x800E1260
+ void ftMainProcUpdateInterrupt(GObj *fighter_gobj)
+ {
+@@ -1367,6 +1376,21 @@ void ftMainProcUpdateInterrupt(GObj *fighter_gobj)
+     u16 button_hold_com;
+     f32 this_jostle;
+ 
++#ifdef PORT
++    if (port_cheat_gameplay_enabled())
++    {
++        if (this_fp->pkind == nFTPlayerKindMan)
++        {
++            if (port_cheat_infinite_jumps()) this_fp->jumps_used = 0;
++            if (port_cheat_infinite_shield()) this_fp->shield_health = 55;
++            if (port_cheat_zero_percent()) this_fp->percent_damage = 0;
++        }
++        else if ((this_fp->pkind == nFTPlayerKindCom) && port_cheat_enemy_999())
++        {
++            this_fp->percent_damage = 999;
++        }
++    }
++#endif
+     if (!(this_fp->is_control_disable))
+     {
+         this_fp->status_total_tics++;
 diff --git a/src/gm/gmcamera.c b/src/gm/gmcamera.c
 index c225d29..f447fb6 100644
 --- a/src/gm/gmcamera.c
@@ -115,7 +195,7 @@ index f188036..54a1f10 100644
  		const char *stage_env = getenv("SSB64_SPGAME_STAGE");
  		if (stage_env != NULL)
 diff --git a/src/mn/mnplayers/mnplayersvs.c b/src/mn/mnplayers/mnplayersvs.c
-index 9e161b9..297e695 100644
+index 9e161b9..961491b 100644
 --- a/src/mn/mnplayers/mnplayersvs.c
 +++ b/src/mn/mnplayers/mnplayersvs.c
 @@ -1,4 +1,5 @@
@@ -152,7 +232,7 @@ index 9e161b9..297e695 100644
  	{
  		is_ready = FALSE;
  	}
-@@ -5011,6 +5023,95 @@ void mnPlayersVSPauseSlotProcesses(void)
+@@ -5011,6 +5023,106 @@ void mnPlayersVSPauseSlotProcesses(void)
  }
  
  // 0x8013A920
@@ -202,7 +282,18 @@ index 9e161b9..297e695 100644
 +
 +		if (has_choice != FALSE)
 +		{
-+			if ((slot->pkind != nFTPlayerKindMan) || (sMNPlayersVSNetFkind[s] != fkind) || (sMNPlayersVSNetCostume[s] != costume))
++			/* Check the REAL slot state every frame: the game itself resets a panel (fighter -> none) when it
++			 * (re)creates a cursor for a connected controller port, which would leave this player invisible. */
++			sb32 need = FALSE;
++
++			if ((slot->pkind != nFTPlayerKindMan) || (slot->fkind != fkind) || (slot->is_selected == FALSE) ||
++			    (slot->is_fighter_selected == FALSE) || (slot->held_player != -1) || (slot->holder_player != GMCOMMON_PLAYERS_MAX) ||
++			    (sMNPlayersVSNetFkind[s] != fkind) || (sMNPlayersVSNetCostume[s] != costume) || (slot->player == NULL) ||
++			    ((slot->player->flags & GOBJ_FLAG_HIDDEN) != 0) || (ftGetStruct(slot->player)->fkind != fkind))
++			{
++				need = TRUE;
++			}
++			if (need != FALSE)
 +			{
 +				if (slot->pkind != nFTPlayerKindMan)
 +				{
@@ -248,7 +339,7 @@ index 9e161b9..297e695 100644
  void mnPlayersVSFuncRun(GObj *gobj)
  {
  	s32 gkinds_num;
-@@ -5056,6 +5157,9 @@ void mnPlayersVSFuncRun(GObj *gobj)
+@@ -5056,6 +5168,9 @@ void mnPlayersVSFuncRun(GObj *gobj)
  	sMNPlayersVSTotalTimeTics++;
  
  	mnPlayersVSUpdateControllerOrders();
@@ -258,7 +349,7 @@ index 9e161b9..297e695 100644
  
  	if (sMNPlayersVSTotalTimeTics == sMNPlayersVSReturnTic)
  	{
-@@ -5098,6 +5202,7 @@ void mnPlayersVSFuncRun(GObj *gobj)
+@@ -5098,6 +5213,7 @@ void mnPlayersVSFuncRun(GObj *gobj)
  					gSCManagerSceneData.scene_curr = nSCKind1PGame;
  
  					mnPlayersVSSetSceneDataClassicCoop();
@@ -266,7 +357,7 @@ index 9e161b9..297e695 100644
  					port_classic_coop_set_context(0);
  					syTaskmanSetLoadScene();
  					return;
-@@ -5388,7 +5493,7 @@ void mnPlayersVSInitVars(void)
+@@ -5388,7 +5504,7 @@ void mnPlayersVSInitVars(void)
  		extern int port_classic_coop_context(void);
  		if (port_classic_coop_context())
  		{
@@ -831,6 +922,75 @@ index 6c8e8bd..44a31ec 100644
  #endif
  };
  
+diff --git a/src/sys/audio.c b/src/sys/audio.c
+index 0db5b47..60bacda 100644
+--- a/src/sys/audio.c
++++ b/src/sys/audio.c
+@@ -15,6 +15,10 @@
+ extern void func_80026738_27338(void *arg0);
+ extern void func_800266A0_272A0(void);
+ extern void func_80026204_26E04(void *arg0);
++// music_override.cpp (mods/music)
++extern int portMusicPlay(int player, u32 bgm);
++extern void portMusicStop(int player);
++extern void portMusicSetVolume(int player, u32 vol);
+ #endif
+ 
+ extern SYAudioSettings dSYAudioPublicSettings2, dSYAudioPublicSettings3;
+@@ -1266,6 +1270,7 @@ void syAudioThreadMain(void *arg)
+                         sSYAudioBGMVolumes[port_i] = 30720.0F;
+                     }
+                     n_alCSPSetVol(gSYAudioCSPlayers[port_i], sSYAudioBGMVolumes[port_i]);
++                    portMusicSetVolume(port_i, (u32)sSYAudioBGMVolumes[port_i]);
+                 }
+             }
+ 
+@@ -1493,6 +1498,9 @@ void syAudioThreadMain(void *arg)
+                     sSYAudioBGMVolumes[i] = 30720.0F;
+                 }
+                 n_alCSPSetVol(gSYAudioCSPlayers[i], sSYAudioBGMVolumes[i]);
++#ifdef PORT
++                portMusicSetVolume(i, (u32)sSYAudioBGMVolumes[i]);
++#endif
+             }
+         }
+         if (dSYAudioIsSettingsUpdated != FALSE)
+@@ -1666,6 +1674,15 @@ s32 syAudioPlayBGM(s32 sngplayer, u32 bgm)
+ 
+     bgm = port_enhancement_shuffle_music(bgm); // music shuffler
+ 
++    if (portMusicPlay(sngplayer, bgm) != 0)
++    {
++        // A mods/music override replaces this track: silence the original sequence.
++        sSYAudioCSPlayerStatuses[sngplayer] = AL_PLAYING;
++        sSYAudioBGMPlayingIDs[sngplayer] = -1;
++
++        return bgm;
++    }
++
+ #endif
+     if (bgm < sSYAudioSeqFile->seqCount)
+     {
+@@ -1680,6 +1697,9 @@ s32 syAudioPlayBGM(s32 sngplayer, u32 bgm)
+ // 0x80020B08
+ void syAudioStopBGM(s32 sngplayer)
+ {
++#ifdef PORT
++    portMusicStop(sngplayer);
++#endif
+     sSYAudioCSPlayerStatuses[sngplayer] = AL_PLAYING;
+     sSYAudioBGMPlayingIDs[sngplayer] = -1;
+ }
+@@ -1692,6 +1712,9 @@ void syAudioSetBGMVolume(s32 sngplayer, u32 vol)
+         vol = 30720;
+     }
+     n_alCSPSetVol(gSYAudioCSPlayers[sngplayer], vol);
++#ifdef PORT
++    portMusicSetVolume(sngplayer, vol);
++#endif
+     sSYAudioBGMVolumes[sngplayer] = vol;
+     sSYAudioBGMVolumeTimers[sngplayer] = 0;
+ }
 diff --git a/src/sys/controller.c b/src/sys/controller.c
 index 428e99d..65eb79f 100644
 --- a/src/sys/controller.c
@@ -866,7 +1026,7 @@ index 428e99d..65eb79f 100644
      for (i = 0; i != MAXCONTROLLERS; i++)
      {
 diff --git a/src/sys/netinput.c b/src/sys/netinput.c
-index c6ecef7..3e6d3e0 100644
+index c6ecef7..61855d6 100644
 --- a/src/sys/netinput.c
 +++ b/src/sys/netinput.c
 @@ -1,5 +1,6 @@
@@ -876,7 +1036,7 @@ index c6ecef7..3e6d3e0 100644
  #include <sys/netpeer.h>
  #include <sys/taskman.h>
  
-@@ -532,12 +533,68 @@ sb32 syNetInputGetReplayMetadata(SYNetInputReplayMetadata *out_metadata)
+@@ -532,12 +533,69 @@ sb32 syNetInputGetReplayMetadata(SYNetInputReplayMetadata *out_metadata)
  	return TRUE;
  }
  
@@ -903,6 +1063,7 @@ index c6ecef7..3e6d3e0 100644
 +	}
 +	syNetLobbySampleLocal(tick);
 +	syNetLobbySetHeld(FALSE);
++	syNetLobbySyncCheck(tick); /* before the reseed: desync detection */
 +	syNetLobbyReseedTick(tick);
 +
 +	for (player = 0; player < MAXCONTROLLERS; player++)
@@ -947,10 +1108,10 @@ index c6ecef7..3e6d3e0 100644
  
 diff --git a/src/sys/netlobby.c b/src/sys/netlobby.c
 new file mode 100644
-index 0000000..9a508dd
+index 0000000..79b0a27
 --- /dev/null
 +++ b/src/sys/netlobby.c
-@@ -0,0 +1,674 @@
+@@ -0,0 +1,844 @@
 +#include <sys/netlobby.h>
 +
 +#ifdef PORT
@@ -986,6 +1147,15 @@ index 0000000..9a508dd
 +	u8 coop_pkind2, coop_level2, spgame_stage, difficulty;
 +	u8 stock_count, friendly_fire, coop_player3, coop_fkind3;
 +	u8 coop_costume3, coop_shade3, pad[2];
++	/* Host's save data that steers the 1P flow (which challengers appear, which fighters are allies/enemies, ...).
++	 * Every peer must use the host's values, otherwise each PC walks a different stage sequence. */
++	u32 settings_hash;
++	u32 hiscore[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
++	u16 fighter_mask;
++	u8 unlock_mask, time_limit;
++	u8 bonus1_count[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
++	u8 bonus2_count[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
++	u8 complete[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
 +
 +} SYNetLobbyRunConfig;
 +
@@ -1065,8 +1235,45 @@ index 0000000..9a508dd
 +	return ((player >= 0) && (player < MAXCONTROLLERS) && (sSYNetLobbyMask & (1U << player))) ? TRUE : FALSE;
 +}
 +
++/* A client plays the run with the host's save data; its own is put back when the run ends. */
++static struct
++{
++	sb32 is_valid;
++	u32 hiscore[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
++	u16 fighter_mask;
++	u8 unlock_mask;
++	u8 bonus1_count[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
++	u8 bonus2_count[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
++	u8 complete[GMCOMMON_FIGHTERS_PLAYABLE_NUM];
++
++} sSYNetLobbySaveBackup;
++
++static void syNetLobbyRestoreSave(void)
++{
++	s32 i;
++
++	if (sSYNetLobbySaveBackup.is_valid == FALSE)
++	{
++		return;
++	}
++	sSYNetLobbySaveBackup.is_valid = FALSE;
++
++	gSCManagerBackupData.unlock_mask = sSYNetLobbySaveBackup.unlock_mask;
++	gSCManagerBackupData.fighter_mask = sSYNetLobbySaveBackup.fighter_mask;
++
++	for (i = 0; i < GMCOMMON_FIGHTERS_PLAYABLE_NUM; i++)
++	{
++		gSCManagerBackupData.spgame_records[i].spgame_hiscore = sSYNetLobbySaveBackup.hiscore[i];
++		gSCManagerBackupData.spgame_records[i].bonus1_task_count = sSYNetLobbySaveBackup.bonus1_count[i];
++		gSCManagerBackupData.spgame_records[i].bonus2_task_count = sSYNetLobbySaveBackup.bonus2_count[i];
++		gSCManagerBackupData.spgame_records[i].is_spgame_complete = sSYNetLobbySaveBackup.complete[i];
++	}
++	lbBackupWrite(); /* the run may have written the host's data to disk: put the player's own back */
++}
++
 +static void syNetLobbyLeaveMatch(void)
 +{
++	syNetLobbyRestoreSave();
 +	sSYNetLobbyIsMatch = FALSE;
 +	sSYNetLobbyIsRun = FALSE;
 +	sSYNetLobbyIsSession = FALSE;
@@ -1082,6 +1289,34 @@ index 0000000..9a508dd
 +
 +static void syNetLobbyApplyRunConfig(const SYNetLobbyRunConfig *cfg)
 +{
++	s32 i;
++
++	if ((np_is_host() == 0) && (sSYNetLobbySaveBackup.is_valid == FALSE))
++	{
++		sSYNetLobbySaveBackup.is_valid = TRUE;
++		sSYNetLobbySaveBackup.unlock_mask = gSCManagerBackupData.unlock_mask;
++		sSYNetLobbySaveBackup.fighter_mask = gSCManagerBackupData.fighter_mask;
++
++		for (i = 0; i < GMCOMMON_FIGHTERS_PLAYABLE_NUM; i++)
++		{
++			sSYNetLobbySaveBackup.hiscore[i] = gSCManagerBackupData.spgame_records[i].spgame_hiscore;
++			sSYNetLobbySaveBackup.bonus1_count[i] = gSCManagerBackupData.spgame_records[i].bonus1_task_count;
++			sSYNetLobbySaveBackup.bonus2_count[i] = gSCManagerBackupData.spgame_records[i].bonus2_task_count;
++			sSYNetLobbySaveBackup.complete[i] = gSCManagerBackupData.spgame_records[i].is_spgame_complete;
++		}
++	}
++	gSCManagerBackupData.unlock_mask = cfg->unlock_mask;
++	gSCManagerBackupData.fighter_mask = cfg->fighter_mask;
++	gSCManagerSceneData.spgame_time_limit = cfg->time_limit; /* stage timer comes from the host */
++
++	for (i = 0; i < GMCOMMON_FIGHTERS_PLAYABLE_NUM; i++)
++	{
++		gSCManagerBackupData.spgame_records[i].spgame_hiscore = cfg->hiscore[i];
++		gSCManagerBackupData.spgame_records[i].bonus1_task_count = cfg->bonus1_count[i];
++		gSCManagerBackupData.spgame_records[i].bonus2_task_count = cfg->bonus2_count[i];
++		gSCManagerBackupData.spgame_records[i].is_spgame_complete = cfg->complete[i];
++	}
++
 +	gSCManagerSceneData.player = cfg->player;
 +	gSCManagerSceneData.fkind = cfg->fkind;
 +	gSCManagerSceneData.costume = cfg->costume;
@@ -1158,6 +1393,22 @@ index 0000000..9a508dd
 +	cfg.difficulty = np_get_run_difficulty();
 +	cfg.stock_count = np_get_run_stocks();
 +	cfg.friendly_fire = np_get_friendly_fire() ? 1 : 0;
++	{
++		s32 k;
++
++		cfg.settings_hash = np_settings_hash();
++		cfg.unlock_mask = gSCManagerBackupData.unlock_mask;
++		cfg.fighter_mask = gSCManagerBackupData.fighter_mask;
++		cfg.time_limit = gSCManagerSceneData.spgame_time_limit;
++
++		for (k = 0; k < GMCOMMON_FIGHTERS_PLAYABLE_NUM; k++)
++		{
++			cfg.hiscore[k] = gSCManagerBackupData.spgame_records[k].spgame_hiscore;
++			cfg.bonus1_count[k] = gSCManagerBackupData.spgame_records[k].bonus1_task_count;
++			cfg.bonus2_count[k] = gSCManagerBackupData.spgame_records[k].bonus2_task_count;
++			cfg.complete[k] = gSCManagerBackupData.spgame_records[k].is_spgame_complete ? 1 : 0;
++		}
++	}
 +	sSYNetLobbyFriendlyFire = cfg.friendly_fire;
 +
 +	/* Same fighter + costume as P1: use the next costume so they look different. */
@@ -1593,7 +1844,87 @@ index 0000000..9a508dd
 +	return ((np_state() == NP_CONNECTED) && (sSYNetLobbyIsMatch == FALSE) && (np_get_panels() != 0)) ? TRUE : FALSE;
 +}
 +
++/* ---- desync detection --------------------------------------------------- */
++
++static u32 syNetLobbyMix(u32 h, u32 v)
++{
++	h ^= v;
++	h *= 16777619U;
++	return h;
++}
++
++static u32 syNetLobbyFloatBits(f32 f)
++{
++	u32 u;
++
++	memcpy(&u, &f, sizeof(u));
++	return u;
++}
++
++/* Every 30 ticks both peers hash the simulation state; the host compares and cancels the run on mismatch.
++ * Positions are only read while a battle is actually running (fighter GObjs are valid then). Every 60 ticks the
++ * values are also logged so two players' logs can be diffed to find the first tick where they diverge. */
++void syNetLobbySyncCheck(u32 tick)
++{
++	u32 h = 2166136261U;
++	s32 i;
++	sb32 running;
++	sb32 do_log = ((tick % 60) == 0) ? TRUE : FALSE;
++
++	if ((tick % 30) != 0)
++	{
++		return;
++	}
++	h = syNetLobbyMix(h, np_settings_hash());
++	h = syNetLobbyMix(h, (u32)gSCManagerSceneData.scene_curr);
++	h = syNetLobbyMix(h, (u32)gSCManagerSceneData.spgame_stage);
++
++	running = ((gSCManagerBattleState != NULL) && (gSCManagerBattleState->game_status == nSCBattleGameStatusGo) &&
++	           ((gSCManagerSceneData.scene_curr == nSCKind1PGame) || (gSCManagerSceneData.scene_curr == nSCKind1PBonusStage) ||
++	            (gSCManagerSceneData.scene_curr == nSCKindVSBattle))) ? TRUE : FALSE;
++
++	if (running != FALSE)
++	{
++		h = syNetLobbyMix(h, (u32)gSCManagerBattleState->time_remain);
++
++		for (i = 0; i < MAXCONTROLLERS; i++)
++		{
++			GObj *gobj = gSCManagerBattleState->players[i].fighter_gobj;
++
++			h = syNetLobbyMix(h, (u32)gSCManagerBattleState->players[i].stock_count);
++
++			if (gobj != NULL)
++			{
++				DObj *dobj = DObjGetStruct(gobj);
++				FTStruct *fp = ftGetStruct(gobj);
++
++				if ((dobj != NULL) && (fp != NULL))
++				{
++					h = syNetLobbyMix(h, syNetLobbyFloatBits(dobj->translate.vec.f.x));
++					h = syNetLobbyMix(h, syNetLobbyFloatBits(dobj->translate.vec.f.y));
++					h = syNetLobbyMix(h, (u32)fp->status_id);
++					h = syNetLobbyMix(h, (u32)fp->percent_damage);
++
++					if (do_log != FALSE)
++					{
++						port_log("SSB64 NetSync   tick=%u p%d x=%.3f y=%.3f status=%d dmg=%d stock=%d\n", tick, (int)i,
++						         dobj->translate.vec.f.x, dobj->translate.vec.f.y, (int)fp->status_id, (int)fp->percent_damage,
++						         (int)gSCManagerBattleState->players[i].stock_count);
++					}
++				}
++			}
++		}
++	}
++	if (do_log != FALSE)
++	{
++		port_log("SSB64 NetSync tick=%u scene=%d stage=%d running=%d hash=%08x\n", tick, (int)gSCManagerSceneData.scene_curr,
++		         (int)gSCManagerSceneData.spgame_stage, (int)running, h);
++	}
++	np_submit_sync(tick, h);
++}
++
 +#else /* !PORT */
++void syNetLobbySyncCheck(u32 tick) {}
 +sb32 syNetLobbyPanelsEnabled(void) { return FALSE; }
 +sb32 syNetLobbyGetPanelChoice(s32 slot, s32 *fkind, s32 *costume) { return FALSE; }
 +void syNetLobbyPublishHostChoice(s32 fkind, s32 costume) {}
@@ -1627,10 +1958,10 @@ index 0000000..9a508dd
 +#endif
 diff --git a/src/sys/netlobby.h b/src/sys/netlobby.h
 new file mode 100644
-index 0000000..1a8e6cf
+index 0000000..fef0ba2
 --- /dev/null
 +++ b/src/sys/netlobby.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,40 @@
 +#ifndef _SYNETLOBBY_H_
 +#define _SYNETLOBBY_H_
 +
@@ -1654,6 +1985,7 @@ index 0000000..1a8e6cf
 +extern void syNetLobbyStopVSSession(void);
 +extern sb32 syNetLobbyCheckExecutionReady(void);
 +extern void syNetLobbyReseedTick(u32 tick);
++extern void syNetLobbySyncCheck(u32 tick);
 +extern sb32 syNetLobbyPanelsEnabled(void);
 +extern sb32 syNetLobbyGetPanelChoice(s32 slot, s32 *fkind, s32 *costume);
 +extern void syNetLobbyPublishHostChoice(s32 fkind, s32 costume);

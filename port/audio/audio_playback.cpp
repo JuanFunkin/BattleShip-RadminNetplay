@@ -13,6 +13,7 @@
 // portAudioPushSilence() once per tick.
 
 #include "audio_playback.h"
+#include "music_override.h"
 #include "port_log.h"
 
 #include <libultraship/bridge/audiobridge.h>
@@ -22,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <vector>
 
 // SSB64 original output rate is 32 kHz.
 // At 60 fps that's ~533 samples/frame. We use the same high/low watermarks
@@ -235,7 +237,11 @@ extern "C" void portAudioSubmitFrame(const void *buf, int sampleCount)
             }
         }
     }
-    const int16_t* pcm = reinterpret_cast<const int16_t*>(buf);
+    // Music overrides (mods/music): mix decoded MP3/OGG/WAV over the synthesized frame.
+    static std::vector<int16_t> sMusicMix;
+    sMusicMix.assign(reinterpret_cast<const int16_t*>(buf), reinterpret_cast<const int16_t*>(buf) + (size_t)sampleCount * 2);
+    portMusicMix(sMusicMix.data(), sampleCount);
+    const int16_t* pcm = sMusicMix.data();
     pcm = applyOutputFilter(pcm, sampleCount);
 
     wavAppend(pcm, byteLen);

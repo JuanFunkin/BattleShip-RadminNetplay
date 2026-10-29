@@ -36,6 +36,7 @@ class PortMenu : public Ship::Menu {
     void AddMenuAbout();
 #ifndef DISABLE_SCRIPTING
     void AddMenuMods();
+    void AddMenuAudioEditor();
 #endif
 
   private:

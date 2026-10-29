@@ -617,7 +617,7 @@ bool HiResPack::Init() {
             // A .zip pack is read in place: enumerate + index its members. This
             // is the distributed pack format — desktop users drop the zip into
             // mods/, and the Android importer copies the downloaded zip here.
-            if (HasExt(name, "zip")) {
+            if (HasExt(name, "zip") || HasExt(name, "o2r")) {
                 ScanZip(path, mStats);
                 continue;
             }

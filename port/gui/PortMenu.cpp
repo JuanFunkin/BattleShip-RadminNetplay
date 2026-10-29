@@ -28,6 +28,7 @@ namespace ssb64 { void MountModsDir(); void UnmountMissingMods(); }
 #endif
 
 #include <imgui.h>
+#include "../audio/music_override.h"
 #include "../netplay/netplay.h"
 #include "../widescreen/widescreen.h"
 #include <chrono>
@@ -1336,6 +1337,20 @@ void PortMenu::AddMenuSettings() {
     AddWidget(path, "Unlock Item Switch Menu", WIDGET_CVAR_CHECKBOX).CVar("gCheats.UnlockItemSwitch").RaceDisable(false);
     AddWidget(path, "Unlock Sound Test Menu", WIDGET_CVAR_CHECKBOX).CVar("gCheats.UnlockSoundTest").RaceDisable(false);
 
+    AddWidget(path, "Gameplay Cheats (offline only)", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Enable Gameplay Cheats", WIDGET_CVAR_CHECKBOX)
+        .CVar("gCheats.Gameplay")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().Tooltip("Master switch for the cheats below. They only affect your own fighters and turn off automatically in online rooms."));
+    AddWidget(path, "Infinite Jumps", WIDGET_CVAR_CHECKBOX).CVar("gCheats.InfiniteJumps").RaceDisable(false);
+    AddWidget(path, "Infinite Shield", WIDGET_CVAR_CHECKBOX).CVar("gCheats.InfiniteShield").RaceDisable(false);
+    AddWidget(path, "Always 0% Damage", WIDGET_CVAR_CHECKBOX).CVar("gCheats.ZeroPercent").RaceDisable(false);
+    AddWidget(path, "Infinite Stocks / Lives", WIDGET_CVAR_CHECKBOX).CVar("gCheats.InfiniteStocks").RaceDisable(false);
+    AddWidget(path, "CPU Fighters Always at 999%", WIDGET_CVAR_CHECKBOX)
+        .CVar("gCheats.Enemy999")
+        .RaceDisable(false)
+        .Options(CheckboxOptions().Tooltip("Every CPU opponent sits at 999% so a single hit sends them flying."));
+
     // --- Tools ---
     path.sidebarName = "Tools";
     path.column = SECTION_COLUMN_1;
@@ -1554,6 +1569,84 @@ static void DoHotReload() {
     } catch (const std::exception& e) {
         SPDLOG_ERROR("Mod reload failed: {}", e.what());
     }
+}
+
+// Audio Editor: pick which music file plays for each in-game track (like SoH's audio editor).
+// Music files come from mods/ (loose `music/` folder or any .zip/.o2r with `music/*.mp3|ogg|wav`).
+static const char* const kBgmNames[] = {
+    "Dream Land", "Planet Zebes", "Mushroom Kingdom", "Mushroom Kingdom (hurry)", "Sector Z", "Kongo Jungle",
+    "Peach's Castle", "Saffron City", "Yoshi's Island", "Hyrule Castle", "Character / Stage Select",
+    "Victory (default)", "Victory: Mario", "Victory: Samus", "Victory: Donkey Kong", "Victory: Kirby", "Victory: Fox",
+    "Victory: Ness", "Victory: Yoshi", "Victory: Captain Falcon", "Victory: Pokemon", "Victory: Link",
+    "VS Results", "Final Stage (Master Hand)", "Master Hand Appears", "Final Destination", "Bonus Stage",
+    "1P Stage Clear", "Bonus Stage Clear", "1P Game Clear", "Bonus Stage Failure", "Continue?", "Game Over",
+    "Opening Movie", "How to Play", "1P Stage Cards", "Battlefield", "Meta Crystal", "Ending Movie", "Credits",
+    "Secret Found", "Challenger Approaching", "Training Mode", "Character Data / VS Records", "Main Menu",
+    "Hammer", "Star",
+};
+
+void PortMenu::AddMenuAudioEditor() {
+    WidgetPath path = { "Assets", "Audio Editor", SECTION_COLUMN_1 };
+    AddSidebarEntry("Assets", "Audio Editor", 1);
+    AddWidget(path, "audio_editor_panel", WIDGET_CUSTOM)
+        .CustomFunction([](WidgetInfo&) {
+            bool enabled = CVarGetInteger("gMusicOverride.Enabled", 1) != 0;
+            if (ImGui::Checkbox("Enable music replacement", &enabled)) {
+                CVarSetInteger("gMusicOverride.Enabled", enabled ? 1 : 0);
+                Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Rescan mods")) {
+                portMusicRescan();
+            }
+            const int n = portMusicTrackCount();
+            ImGui::TextDisabled("%d music file(s) found in mods/ (music/*.mp3, .ogg, .wav; also inside .zip / .o2r)", n);
+            if (n == 0) {
+                ImGui::TextWrapped("Build a music pack with the web editor (Music tab) and drop the .zip / .o2r into the mods folder, "
+                                   "then press Rescan mods.");
+            }
+            ImGui::TextWrapped("Pick a file for each track. Changes apply the next time that track starts. "
+                               "\"Default\" uses a file named after the track number (e.g. 6.mp3) if present, otherwise the original music.");
+            if (ImGui::SmallButton("Reset all")) {
+                for (int i = 0; i < (int)(sizeof(kBgmNames) / sizeof(kBgmNames[0])); i++) {
+                    CVarClear(fmt::format("gMusicOverride.Sel.{}", i).c_str());
+                }
+                Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Randomize all")) {
+                for (int i = 0; i < (int)(sizeof(kBgmNames) / sizeof(kBgmNames[0])); i++) {
+                    CVarSetString(fmt::format("gMusicOverride.Sel.{}", i).c_str(), "random");
+                }
+                Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+            }
+            ImGui::Separator();
+            for (int id = 0; id < (int)(sizeof(kBgmNames) / sizeof(kBgmNames[0])); id++) {
+                const std::string cv = fmt::format("gMusicOverride.Sel.{}", id);
+                const std::string cur = CVarGetString(cv.c_str(), "");
+                std::string preview = cur.empty() ? "Default" : (cur == "orig" ? "Original" : (cur == "random" ? "Random custom" : cur));
+                ImGui::PushID(id);
+                ImGui::SetNextItemWidth(260.0f);
+                if (ImGui::BeginCombo(fmt::format("{:02d}  {}", id, kBgmNames[id]).c_str(), preview.c_str())) {
+                    auto pick = [&](const char* label, const char* value) {
+                        const bool sel = (cur == value);
+                        if (ImGui::Selectable(label, sel)) {
+                            if (value[0] == '\0') CVarClear(cv.c_str()); else CVarSetString(cv.c_str(), value);
+                            Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+                        }
+                    };
+                    pick("Default", "");
+                    pick("Original", "orig");
+                    pick("Random custom", "random");
+                    ImGui::Separator();
+                    for (int t = 0; t < n; t++) {
+                        pick(portMusicTrackName(t), portMusicTrackName(t));
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::PopID();
+            }
+        });
 }
 
 void PortMenu::AddMenuMods() {
@@ -2075,6 +2168,7 @@ void PortMenu::AddMenuElements() {
     AddMenuAssets();
 #ifndef DISABLE_SCRIPTING
     AddMenuMods();
+    AddMenuAudioEditor();
 #endif
     AddMenuAbout();
 
