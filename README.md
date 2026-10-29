@@ -37,7 +37,7 @@ Keep this list up to date: every new feature gets a line here.
 
 ### Mod and texture tooling
 
-- **Asset editor in the browser** juanfunkin.github.io/BattleShipDX/, English / Español): open your own `BattleShip.o2r`, browse all textures and menu sprites, view stages and fighter models in 3D, replace textures, and export a hi-res pack (`.zip` or `.o2r`) or a music pack. Everything runs locally; nothing is uploaded.
+- **Asset editor in the browser** juanfunkin.github.io/BattleShipDX/ English / Español): open your own `BattleShip.o2r`, browse all textures and menu sprites, view stages and fighter models in 3D, replace textures, and export a hi-res pack (`.zip` or `.o2r`) or a music pack. Everything runs locally; nothing is uploaded.
 - Hi-res texture packs can now also be `.o2r` files. The `mods` folders are created automatically.
 
 ## No copyrighted assets are included in this repository
