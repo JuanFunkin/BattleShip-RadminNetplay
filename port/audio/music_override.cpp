@@ -169,12 +169,12 @@ bool ReadAll(const Source& s, std::vector<unsigned char>* out) {
 bool DecodeWav(const std::vector<unsigned char>& d, std::vector<int16_t>* pcm, int* ch, int* hz) {
     if (d.size() < 44 || std::memcmp(d.data(), "RIFF", 4) != 0 || std::memcmp(d.data() + 8, "WAVE", 4) != 0) return false;
     size_t p = 12; int fmtTag = 0, bits = 0; *ch = 0; *hz = 0;
-    auto u16 = [&](size_t o) { return (int)(d[o] | (d[o + 1] << 8)); };
-    auto u32 = [&](size_t o) { return (uint32_t)(d[o] | (d[o + 1] << 8) | (d[o + 2] << 16) | ((uint32_t)d[o + 3] << 24)); };
+    auto rd16 = [&](size_t o) { return (int)(d[o] | (d[o + 1] << 8)); };
+    auto rd32 = [&](size_t o) { return (uint32_t)(d[o] | (d[o + 1] << 8) | (d[o + 2] << 16) | ((uint32_t)d[o + 3] << 24)); };
     while (p + 8 <= d.size()) {
-        uint32_t sz = u32(p + 4);
+        uint32_t sz = rd32(p + 4);
         if (std::memcmp(d.data() + p, "fmt ", 4) == 0 && p + 24 <= d.size()) {
-            fmtTag = u16(p + 8); *ch = u16(p + 10); *hz = (int)u32(p + 12); bits = u16(p + 22);
+            fmtTag = rd16(p + 8); *ch = rd16(p + 10); *hz = (int)rd32(p + 12); bits = rd16(p + 22);
         } else if (std::memcmp(d.data() + p, "data", 4) == 0) {
             size_t n = std::min<size_t>(sz, d.size() - p - 8);
             const unsigned char* b = d.data() + p + 8;
@@ -224,12 +224,12 @@ std::shared_ptr<Track> Decode(const Source& s) {
     const double step = (double)hz / kOutRate;
     for (size_t i = 0; i < outFrames; i++) {
         double sp = i * step;
-        size_t a = (size_t)sp, b = std::min(a + 1, inFrames - 1);
+        size_t a = (size_t)sp, b = (std::min)(a + 1, inFrames - 1);
         float f = (float)(sp - a);
         for (int c = 0; c < 2; c++) {
             int cc = ch == 1 ? 0 : c;
             float v = raw[a * ch + cc] * (1.0f - f) + raw[b * ch + cc] * f;
-            t->pcm[i * 2 + c] = (int16_t)std::max(-32768.0f, std::min(32767.0f, v));
+            t->pcm[i * 2 + c] = (int16_t)(std::max)(-32768.0f, (std::min)(32767.0f, v));
         }
     }
     return t;
@@ -312,7 +312,7 @@ extern "C" void portMusicStop(int player) {
 
 extern "C" void portMusicSetVolume(int player, unsigned int vol) {
     if (player < 0 || player >= kPlayers) return;
-    float g = std::min(1.0f, (float)vol / 30720.0f);
+    float g = (std::min)(1.0f, (float)vol / 30720.0f);
     std::lock_guard<std::mutex> lk(gMu);
     gLastVol[player] = g;
     gStreams[player].gain = g;
@@ -330,7 +330,7 @@ extern "C" void portMusicMix(short* pcm, int sampleCount) {
             }
             for (int c = 0; c < 2; c++) {
                 int v = pcm[i * 2 + c] + (int)(s.track->pcm[s.pos * 2 + c] * s.gain);
-                pcm[i * 2 + c] = (short)std::max(-32768, std::min(32767, v));
+                pcm[i * 2 + c] = (short)(std::max)(-32768, (std::min)(32767, v));
             }
             s.pos++;
         }

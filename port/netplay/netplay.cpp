@@ -73,7 +73,29 @@ int np_match_mask(void) { return S().MatchMask(); }
 int np_match_delay(void) { return S().MatchDelay(); }
 void np_ready(void) { S().Ready(); }
 int np_start_released(void) { return S().StartReleased() ? 1 : 0; }
+extern "C" {
+int port_get_comp_ruleset(void);
+int port_enhancement_neutral_spawns(void);
+int port_enhancement_cpu_level_9(void);
+int port_enhancement_bonus_stages_enabled(void);
+int port_enhancement_tap_jump_disabled(int player_index);
+int port_cheat_unlock_all_active(void);
+}
+
+uint32_t np_settings_hash(void) {
+    uint32_t h = 2166136261u;
+    auto mix = [&](uint32_t v) { h ^= v; h *= 16777619u; };
+    mix((uint32_t)port_get_comp_ruleset());
+    mix((uint32_t)port_enhancement_neutral_spawns());
+    mix((uint32_t)port_enhancement_cpu_level_9());
+    mix((uint32_t)port_enhancement_bonus_stages_enabled());
+    mix((uint32_t)port_cheat_unlock_all_active());
+    for (int i = 0; i < 4; i++) mix((uint32_t)port_enhancement_tap_jump_disabled(i));
+    return h;
+}
+
 void np_end_match(void) { S().EndMatch(); }
+void np_submit_sync(uint32_t tick, uint32_t hash) { S().SubmitSync(tick, hash); }
 int np_consume_abort(void) { return S().ConsumeAbort(&sAbortReason) ? 1 : 0; }
 const char *np_abort_reason(void) { return sAbortReason.c_str(); }
 
