@@ -40,6 +40,12 @@ void np_set_friendly_fire(int on); /* 1P online: allow players to hurt each othe
 int np_get_friendly_fire(void);
 void np_set_host_costume(int costume); /* host (P1) costume 0..3, or -1 = use the one picked on the character select screen */
 int np_get_host_costume(void);
+void np_set_room_cheats(int mask); /* host: bit0 jumps, 1 shield, 2 0%, 3 stocks, 4 CPU 999% — applied to every player in the next match */
+int np_get_room_cheats(void);
+int np_match_cheats(void);         /* cheat mask of the running online match (same on every peer), 0 outside a match */
+void np_set_stage(int kind);       /* host, VS: -1 = pick on the stage select screen, -2 = random, >=0 = stage id */
+int np_get_stage(void);
+int np_resolve_stage(void);        /* -1 or a concrete stage id (rolls the random choice) */
 void np_set_panels(int on); /* show connected players on the character select panels (default on) */
 int np_get_panels(void);
 

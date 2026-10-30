@@ -43,6 +43,7 @@ namespace ssb64 { void MountModsDir(); void UnmountMissingMods(); }
 #include <cctype>
 #include <cstring>
 #include <filesystem>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
 
@@ -800,7 +801,6 @@ PortMenu::PortMenu()
 }
 
 void PortMenu::AddMenuSettings() {
-    AddMenuEntry("Settings", CVAR_SETTING("Menu.SettingsSidebarSection"));
     AddSidebarEntry("Settings", "General", 2);
 
     WidgetPath path = { "Settings", "General", SECTION_COLUMN_1 };
@@ -1178,9 +1178,10 @@ void PortMenu::AddMenuSettings() {
         .Options(CheckboxOptions().Tooltip("Disables the in-game HUD. Note that some icons will still be visible (e.g. CPU icons in 1P Mode on the top-left.)"));
 
     // --- Input customization ---
+    path.sectionName = "Controls";
     path.sidebarName = "Input Mappings";
     path.column = SECTION_COLUMN_1;
-    AddSidebarEntry("Settings", "Input Mappings", 1);
+    AddSidebarEntry("Controls", "Input Mappings", 1);
 
     AddWidget(path, "Controller", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Controller Configuration", WIDGET_WINDOW_BUTTON)
@@ -1193,7 +1194,7 @@ void PortMenu::AddMenuSettings() {
     // --- Controls sidebar: per-player input remapping ---
     path.sidebarName = "Control Enhancements";
     path.column = SECTION_COLUMN_1;
-    AddSidebarEntry("Settings", "Control Enhancements", 1);
+    AddSidebarEntry("Controls", "Control Enhancements", 1);
 
     for (int p = 0; p < PORT_ENHANCEMENT_MAX_PLAYERS; ++p) {
         const std::string playerLabel = fmt::format("Player {}", p + 1);
@@ -1257,6 +1258,7 @@ void PortMenu::AddMenuSettings() {
     }
 
     // --- Audio ---
+    path.sectionName = "Settings";
     path.sidebarName = "Audio";
     path.column = SECTION_COLUMN_1;
     AddSidebarEntry("Settings", "Audio", 1);
@@ -1317,9 +1319,10 @@ void PortMenu::AddMenuSettings() {
             .DefaultValue(false));
 
     // --- Cheats ---
+    path.sectionName = "Enhancements";
     path.sidebarName = "Cheats";
     path.column = SECTION_COLUMN_1;
-    AddSidebarEntry("Settings", "Cheats", 1);
+    AddSidebarEntry("Enhancements", "Cheats", 1);
 
     AddWidget(path, "Master Unlocks", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Unlock Everything", WIDGET_CVAR_CHECKBOX)
@@ -1352,9 +1355,10 @@ void PortMenu::AddMenuSettings() {
         .Options(CheckboxOptions().Tooltip("Every CPU opponent sits at 999% so a single hit sends them flying."));
 
     // --- Tools ---
+    path.sectionName = "Dev Tools";
     path.sidebarName = "Tools";
     path.column = SECTION_COLUMN_1;
-    AddSidebarEntry("Settings", "Tools", 1);
+    AddSidebarEntry("Dev Tools", "Tools", 1);
 
     AddWidget(path, "Debug Windows", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "Stats", WIDGET_WINDOW_BUTTON)
@@ -1378,10 +1382,9 @@ void PortMenu::AddMenuSettings() {
 }
 
 void PortMenu::AddMenuAssets() {
-    AddMenuEntry("Assets", CVAR_SETTING("Menu.AssetsSidebarSection"));
 
-    WidgetPath path = { "Assets", "Extraction", SECTION_COLUMN_1 };
-    AddSidebarEntry("Assets", "Extraction", 1);
+    WidgetPath path = { "Dev Tools", "Extraction", SECTION_COLUMN_1 };
+    AddSidebarEntry("Dev Tools", "Extraction", 1);
     AddWidget(path, "Extraction", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, SSB64_O2R_NAME " is generated from your ROM and loaded on launch.", WIDGET_TEXT);
     AddWidget(path, "Schedule Re-extract", WIDGET_BUTTON)
@@ -1396,16 +1399,17 @@ void PortMenu::AddMenuAssets() {
                      .Size(Sizes::Inline));
 
     path.sidebarName = "Paths";
-    AddSidebarEntry("Assets", "Paths", 1);
+    AddSidebarEntry("Dev Tools", "Paths", 1);
     AddWidget(path, "Runtime Paths", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, fmt::format("App directory: {}", Ship::Context::GetPathRelativeToAppDirectory("")), WIDGET_TEXT);
     AddWidget(path, fmt::format("Main archive: {}", Ship::Context::GetPathRelativeToAppDirectory(SSB64_O2R_NAME)),
               WIDGET_TEXT);
 
 #ifdef PORT_HIRES_ENABLED
+    path.sectionName = "Settings";
     path.sidebarName = "Mods";
     path.column = SECTION_COLUMN_1;
-    AddSidebarEntry("Assets", "Mods", 1);
+    AddSidebarEntry("Settings", "Mods", 1);
 
     AddWidget(path, "Hi-Res Texture Pack", WIDGET_SEPARATOR_TEXT);
     AddWidget(path,
@@ -1586,8 +1590,8 @@ static const char* const kBgmNames[] = {
 };
 
 void PortMenu::AddMenuAudioEditor() {
-    WidgetPath path = { "Assets", "Audio Editor", SECTION_COLUMN_1 };
-    AddSidebarEntry("Assets", "Audio Editor", 1);
+    WidgetPath path = { "Enhancements", "Audio Editor", SECTION_COLUMN_1 };
+    AddSidebarEntry("Enhancements", "Audio Editor", 1);
     AddWidget(path, "audio_editor_panel", WIDGET_CUSTOM)
         .CustomFunction([](WidgetInfo&) {
             bool enabled = CVarGetInteger("gMusicOverride.Enabled", 1) != 0;
@@ -1605,7 +1609,7 @@ void PortMenu::AddMenuAudioEditor() {
                 ImGui::TextWrapped("Build a music pack with the web editor (Music tab) and drop the .zip / .o2r into the mods folder, "
                                    "then press Rescan mods.");
             }
-            ImGui::TextWrapped("Pick a file for each track. Changes apply the next time that track starts. "
+            ImGui::TextWrapped("Pick what plays on each stage / screen: the default music, another song of the game (e.g. Mushroom Kingdom on Dream Land), a custom file, or random. Changes apply the next time that track starts. "
                                "\"Default\" uses a file named after the track number (e.g. 6.mp3) if present, otherwise the original music.");
             if (ImGui::SmallButton("Reset all")) {
                 for (int i = 0; i < (int)(sizeof(kBgmNames) / sizeof(kBgmNames[0])); i++) {
@@ -1624,7 +1628,8 @@ void PortMenu::AddMenuAudioEditor() {
             for (int id = 0; id < (int)(sizeof(kBgmNames) / sizeof(kBgmNames[0])); id++) {
                 const std::string cv = fmt::format("gMusicOverride.Sel.{}", id);
                 const std::string cur = CVarGetString(cv.c_str(), "");
-                std::string preview = cur.empty() ? "Default" : (cur == "orig" ? "Original" : (cur == "random" ? "Random custom" : cur));
+                std::string preview = cur.empty() ? "Default" : (cur == "orig" ? "Original" : (cur == "random" ? "Random custom file" : (cur == "any" ? "Random (any song)" :
+                    (cur.rfind("game:", 0) == 0 ? std::string("Song: ") + kBgmNames[std::clamp(std::atoi(cur.c_str() + 5), 0, 46)] : cur))));
                 ImGui::PushID(id);
                 ImGui::SetNextItemWidth(260.0f);
                 if (ImGui::BeginCombo(fmt::format("{:02d}  {}", id, kBgmNames[id]).c_str(), preview.c_str())) {
@@ -1637,8 +1642,17 @@ void PortMenu::AddMenuAudioEditor() {
                     };
                     pick("Default", "");
                     pick("Original", "orig");
-                    pick("Random custom", "random");
+                    pick("Random (any song)", "any");
+                    pick("Random custom file", "random");
                     ImGui::Separator();
+                    ImGui::TextDisabled("Swap with a song of the game");
+                    for (int g = 0; g < (int)(sizeof(kBgmNames) / sizeof(kBgmNames[0])); g++) {
+                        if (g == id) continue;
+                        const std::string gv = fmt::format("game:{}", g);
+                        pick(fmt::format("{:02d}  {}", g, kBgmNames[g]).c_str(), gv.c_str());
+                    }
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Custom files");
                     for (int t = 0; t < n; t++) {
                         pick(portMusicTrackName(t), portMusicTrackName(t));
                     }
@@ -1650,8 +1664,8 @@ void PortMenu::AddMenuAudioEditor() {
 }
 
 void PortMenu::AddMenuMods() {
-    WidgetPath path = { "Assets", "Script Mods", SECTION_COLUMN_1 };
-    AddSidebarEntry("Assets", "Script Mods", 1);
+    WidgetPath path = { "Settings", "Script Mods", SECTION_COLUMN_1 };
+    AddSidebarEntry("Settings", "Script Mods", 1);
     AddWidget(path, "mods_panel", WIDGET_CUSTOM)
         .CustomFunction([](WidgetInfo&) {
             // --- Action bar -------------------------------------------------
@@ -1782,6 +1796,7 @@ void PortMenu::AddMenuMods() {
 
 extern "C" {
 int syNetLobbyGetFighterCount(void);
+int syNetLobbyIsRoomOpen(void);
 const char* syNetLobbyGetFighterName(int index);
 }
 
@@ -1789,25 +1804,32 @@ namespace {
 
 // Online / LAN multiplayer panel (host = Player 1, up to 3 clients = P2..P4).
 // See docs/netplay.md.
-void RenderNetplayPanel(WidgetInfo& /*widget*/) {
-    static char name[17] = "";
-    static char hostIp[64] = "";
-    static int port = 7777;
-    static int delay = 5;
-    static int mode = 0;        // 0 = VS Mode, 1 = 1P Mode (co-op)
-    static int maxPlayers = 4;
-    static int difficulty = 2;  // 0 Very Easy .. 4 Very Hard
-    static int lives = 3;       // 1..5
-    static bool friendlyFire = false;
-    static int hostCostume = -1; // -1 = pick on the character select screen
-    static bool showPanels = true;
-    static int fighter = 0;
-    static int costume = 0;
-    static bool loaded = false;
-    if (!loaded) {
+// ---------------------------------------------------------------------------
+// Network menu (LAN Online). State lives here so the three sidebars share it.
+// ---------------------------------------------------------------------------
+struct NpUi {
+    std::string name = "Player";
+    std::string hostIp = "26.0.0.1";
+    int port = 7777;
+    int delay = 5;
+    int mode = 0;          // 0 = VS Mode, 1 = 1P Mode (co-op)
+    int maxPlayers = 4;
+    int difficulty = 2;    // 0 Very Easy .. 4 Very Hard
+    int lives = 3;         // 1..5
+    bool friendlyFire = false;
+    int hostCostume = -1;  // -1 = pick on the character select screen
+    bool showPanels = true;
+    int fighter = 0;
+    int costume = 0;
+    int stage = -1;        // -1 = stage select screen, -2 = random, 0.. = stage id
+    int cheatMask = 0;     // room cheats (bit0 jumps, 1 shield, 2 0%, 3 stocks, 4 CPU 999%)
+    bool loaded = false;
+
+    void Load() {
+        if (loaded) return;
         loaded = true;
-        snprintf(name, sizeof(name), "%s", CVarGetString("gNetplay.Name", "Player"));
-        snprintf(hostIp, sizeof(hostIp), "%s", CVarGetString("gNetplay.HostIp", "26.0.0.1"));
+        name = CVarGetString("gNetplay.Name", "Player");
+        hostIp = CVarGetString("gNetplay.HostIp", "26.0.0.1");
         port = CVarGetInteger("gNetplay.Port", 7777);
         delay = CVarGetInteger("gNetplay.Delay", 5);
         mode = CVarGetInteger("gNetplay.Mode", 0);
@@ -1817,13 +1839,17 @@ void RenderNetplayPanel(WidgetInfo& /*widget*/) {
         friendlyFire = CVarGetInteger("gNetplay.FriendlyFire", 0) != 0;
         hostCostume = CVarGetInteger("gNetplay.HostCostume", -1);
         showPanels = CVarGetInteger("gNetplay.ShowPanels", 1) != 0;
-        np_set_panels(showPanels ? 1 : 0);
         fighter = CVarGetInteger("gNetplay.Fighter", 0);
         costume = CVarGetInteger("gNetplay.Costume", 0);
+        stage = CVarGetInteger("gNetplay.Stage", -1);
+        cheatMask = CVarGetInteger("gNetplay.RoomCheats", 0);
+        np_set_panels(showPanels ? 1 : 0);
+        np_set_stage(stage);
+        np_set_room_cheats(cheatMask);
     }
-    auto save = [&] {
-        CVarSetString("gNetplay.Name", name);
-        CVarSetString("gNetplay.HostIp", hostIp);
+    void Save() {
+        CVarSetString("gNetplay.Name", name.c_str());
+        CVarSetString("gNetplay.HostIp", hostIp.c_str());
         CVarSetInteger("gNetplay.Port", port);
         CVarSetInteger("gNetplay.Delay", delay);
         CVarSetInteger("gNetplay.Mode", mode);
@@ -1835,247 +1861,394 @@ void RenderNetplayPanel(WidgetInfo& /*widget*/) {
         CVarSetInteger("gNetplay.ShowPanels", showPanels ? 1 : 0);
         CVarSetInteger("gNetplay.Fighter", fighter);
         CVarSetInteger("gNetplay.Costume", costume);
+        CVarSetInteger("gNetplay.Stage", stage);
+        CVarSetInteger("gNetplay.RoomCheats", cheatMask);
         Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
-    };
+    }
+    // Pushes the host-side options into the session (cheap; safe to call every change).
+    void ApplyHost() {
+        np_set_input_delay(delay);
+        np_set_mode(mode);
+        np_set_max_players(mode == 1 ? std::clamp(maxPlayers, 2, 3) : std::clamp(maxPlayers, 2, 4));
+        np_set_run_options(difficulty, lives - 1);
+        np_set_friendly_fire(friendlyFire ? 1 : 0);
+        np_set_host_costume(hostCostume);
+        np_set_stage(stage);
+        np_set_room_cheats(cheatMask);
+    }
+};
+static NpUi U;
 
+static const std::map<int32_t, const char*> kNpStages = {
+    { -2, "Random" }, { -1, "Pick on the stage select screen" }, { 0, "Peach's Castle" }, { 1, "Sector Z" },
+    { 2, "Kongo Jungle" }, { 3, "Planet Zebes" }, { 4, "Hyrule Castle" }, { 5, "Yoshi's Island" },
+    { 6, "Dream Land" }, { 7, "Saffron City" }, { 8, "Mushroom Kingdom (must be unlocked)" },
+};
+static const std::map<int32_t, const char*> kNpDifficulty = {
+    { 0, "Very Easy" }, { 1, "Easy" }, { 2, "Normal" }, { 3, "Hard" }, { 4, "Very Hard" },
+};
+static const std::map<int32_t, const char*> kNpCostumes = {
+    { -1, "From character select" }, { 0, "Costume 1" }, { 1, "Costume 2" }, { 2, "Costume 3" }, { 3, "Costume 4" },
+};
+
+static void NpHeader(const char* text) {
+    UIWidgets::PaddedSeparator(true, false);
+    ImGui::TextColored(ImVec4(0.65f, 0.80f, 1.0f, 1.0f), "%s", text);
+    UIWidgets::PaddedSeparator(false, true);
+}
+
+static bool NpCheck(const char* label, bool* v, const char* tip) {
+    return UIWidgets::Checkbox(label, v, CheckboxOptions().Tooltip(tip));
+}
+
+static bool NpFighterPicker(bool live) {
+    bool changed = false;
+    const int n = syNetLobbyGetFighterCount();
+    std::map<int32_t, const char*> fighters;
+    for (int i = 0; i < n; i++) fighters[i] = syNetLobbyGetFighterName(i);
+    int32_t f = U.fighter;
+    if (UIWidgets::Combobox("Your fighter", &f, fighters,
+                            ComboboxOptions().Tooltip("The fighter you will use in the match."))) {
+        U.fighter = f;
+        changed = true;
+    }
+    if (UIWidgets::SliderInt("Costume", &U.costume,
+                             IntSliderOptions().Min(0).Max(3).DefaultValue(0).Tooltip("Costume (0-3) of your fighter."))) {
+        changed = true;
+    }
+    if (changed) {
+        if (live) np_set_choice(U.fighter, U.costume);
+        U.Save();
+    }
+    return changed;
+}
+
+// "LAN Online": connect, host, join and the lobby.
+void RenderLanOnline(WidgetInfo&) {
+    U.Load();
     const int state = np_state();
     const bool idle = (state == NP_IDLE || state == NP_FAILED);
 
-    ImGui::TextWrapped("Everybody must run the exact same build with the same settings. "
-                       "Open the UDP port in the firewall on the host. Radmin VPN: the host shares "
-                       "its Radmin IP (26.x.x.x).");
-    ImGui::Separator();
-
-    auto tutorial = [&] {
-        ImGui::Separator();
-        ImGui::TextDisabled("How it works");
-        ImGui::BulletText("The host is Player 1. Up to 3 friends can join as Player 2, 3 and 4.");
-        ImGui::BulletText("HOST: press \"Host game\", then tell your friends your IP address\n"
-                          "(Radmin VPN or LAN IP) and the port. You are taken to the VS character select.");
-        ImGui::BulletText("JOINERS: type the host's IP and the same port, pick your fighter and costume,\n"
-                          "then press \"Join game\". You will wait on the VS screen.");
-        ImGui::BulletText("HOST: choose your fighter, the rules and the stage, then press START.\n"
-                          "Everybody connected is pulled into the match automatically.");
-        ImGui::BulletText("Each player uses their own controller on port 1 of their own PC.");
-        ImGui::BulletText("Lag or stuttering? The host can raise the Input delay before hosting.");
-        ImGui::BulletText("If someone disconnects during a match, the match ends for everybody.");
-        ImGui::BulletText("VS Mode: 2 to 4 players fight each other. The host chooses how many can join.");
-        ImGui::BulletText("1P Mode (experimental): you and up to TWO friends play the story mode together as allies.\n"
-                          "1P Mode only allows up to 3 players. If it desyncs, the run is cancelled for everybody.");
-    };
+    ImGui::TextWrapped("Play with friends over a LAN or a VPN (Radmin / Hamachi). Everybody must run the exact same "
+                       "build with the same settings. The host shares its IP and the UDP port opened in the firewall.");
 
     if (idle) {
-        ImGui::InputText("Your name", name, sizeof(name));
-        ImGui::InputInt("UDP port", &port);
-        port = std::clamp(port, 1024, 65535);
+        NpHeader("Your profile");
+        if (UIWidgets::InputString("Your name", &U.name, InputOptions().Tooltip("Name shown to the other players (max 16 characters)."))) {
+            if (U.name.size() > 16) U.name.resize(16);
+            U.Save();
+        }
+        if (UIWidgets::InputInt("UDP port", &U.port, InputOptions().Tooltip("Port used by the host (1024-65535)."))) {
+            U.port = std::clamp(U.port, 1024, 65535);
+            U.Save();
+        }
 
-        ImGui::Separator();
-        ImGui::Text("Host a game (you are Player 1)");
-        ImGui::Text("Game mode");
-        ImGui::RadioButton("VS Mode (fight each other)", &mode, 0);
-        ImGui::RadioButton("1P Mode (co-op, experimental)", &mode, 1);
-        if (mode == 1) {
-            maxPlayers = std::clamp(maxPlayers, 2, 3);
-            ImGui::SliderInt("Max players (1P Mode)", &maxPlayers, 2, 3);
-            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f),
-                               "1P Mode only allows up to 3 players online (the host and up to two friends, as allies).");
-            static const char* kDifficulties[] = { "Very Easy", "Easy", "Normal", "Hard", "Very Hard" };
-            difficulty = std::clamp(difficulty, 0, 4);
-            if (ImGui::BeginCombo("Difficulty", kDifficulties[difficulty])) {
-                for (int i = 0; i < 5; i++) {
-                    if (ImGui::Selectable(kDifficulties[i], i == difficulty)) difficulty = i;
-                }
-                ImGui::EndCombo();
-            }
-            lives = std::clamp(lives, 1, 5);
-            ImGui::SliderInt("Lives (stocks)", &lives, 1, 5);
-            ImGui::Checkbox("Friendly fire (players can hurt each other)", &friendlyFire);
-        } else {
-            maxPlayers = std::clamp(maxPlayers, 2, 4);
-            ImGui::SliderInt("Max players", &maxPlayers, 2, 4);
-        }
-        {
-            static const char* kCostumeLabels[] = { "From character select", "Costume 1", "Costume 2", "Costume 3", "Costume 4" };
-            hostCostume = std::clamp(hostCostume, -1, 3);
-            if (ImGui::BeginCombo("Your costume (Player 1)", kCostumeLabels[hostCostume + 1])) {
-                for (int i = -1; i < 4; i++) {
-                    if (ImGui::Selectable(kCostumeLabels[i + 1], i == hostCostume)) hostCostume = i;
-                }
-                ImGui::EndCombo();
-            }
-        }
-        if (ImGui::Checkbox("Show connected players on the character select panels", &showPanels)) {
-            np_set_panels(showPanels ? 1 : 0);
-            save();
-        }
-        ImGui::TextDisabled("Experimental. If the character select screen glitches, turn this off (a name strip is shown instead).");
-        ImGui::SliderInt("Input delay (frames)", &delay, 1, 12);
-        ImGui::TextDisabled("Higher = smoother over bad connections, but more input lag. 4-6 is good on Radmin.");
-        if (ImGui::Button("Host game")) {
-            save();
-            np_set_input_delay(delay);
-            if (np_host((uint16_t)port, name)) {
-                np_set_mode(mode);
-                np_set_run_options(difficulty, lives - 1);
-                np_set_friendly_fire(friendlyFire ? 1 : 0);
-                np_set_host_costume(hostCostume);
-                np_set_max_players(mode == 1 ? std::clamp(maxPlayers, 2, 3) : maxPlayers);
+        NpHeader("Host a game (you are Player 1)");
+        ImGui::TextDisabled("Game mode, stage, players, rules and cheats are set in \"Match Options\".");
+        if (UIWidgets::Button("Host game", ButtonOptions().Size(Sizes::Inline).Color(Colors::Green)
+                                              .Tooltip("Opens a room and takes you to the VS character select."))) {
+            U.Save();
+            if (np_host((uint16_t)U.port, U.name.c_str())) {
+                U.ApplyHost();
             }
         }
 
-        ImGui::Separator();
-        ImGui::Text("Join a game (you become Player 2, 3 or 4)");
-        ImGui::InputText("Host IP", hostIp, sizeof(hostIp));
-        const int n = syNetLobbyGetFighterCount();
-        if (ImGui::BeginCombo("Your fighter", syNetLobbyGetFighterName(fighter))) {
-            for (int i = 0; i < n; i++) {
-                if (ImGui::Selectable(syNetLobbyGetFighterName(i), i == fighter)) fighter = i;
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::SliderInt("Costume", &costume, 0, 3);
-        if (ImGui::Button("Join game")) {
-            save();
-            np_join(hostIp, (uint16_t)port, name);
-            np_set_choice(fighter, costume);
+        NpHeader("Join a game (you become Player 2, 3 or 4)");
+        if (UIWidgets::InputString("Host IP", &U.hostIp, InputOptions().Tooltip("IP address of the host (Radmin / LAN)."))) U.Save();
+        NpFighterPicker(false);
+        if (UIWidgets::Button("Join game", ButtonOptions().Size(Sizes::Inline).Color(Colors::Blue)
+                                               .Tooltip("Connects to the host and waits on the VS screen."))) {
+            U.Save();
+            np_join(U.hostIp.c_str(), (uint16_t)U.port, U.name.c_str());
+            np_set_choice(U.fighter, U.costume);
         }
         if (state == NP_FAILED) {
             ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.0f), "%s", np_status());
         }
-        tutorial();
         return;
     }
 
+    NpHeader("Lobby");
     ImGui::Text("%s", np_status());
-    ImGui::Text("Mode: %s   Max players: %d", np_get_mode() == 1 ? "1P Mode (co-op, experimental)" : "VS Mode",
+    ImGui::Text("Mode: %s    Max players: %d", np_get_mode() == 1 ? "1P Mode (co-op, experimental)" : "VS Mode",
                 np_get_max_players());
-    ImGui::Separator();
+    UIWidgets::Spacer(4.0f);
     for (int s = 0; s < 4; s++) {
         if (np_slot_used(s)) {
             int f = 0, c = 0;
             np_slot_choice(s, &f, &c);
             if (s == 0) {
-                ImGui::Text("P1  %s  (host)%s", np_slot_name(s), np_local_slot() == 0 ? "  <- you" : "");
+                ImGui::BulletText("P1  %s  (host)%s", np_slot_name(s), np_local_slot() == 0 ? "   <- you" : "");
             } else {
-                ImGui::Text("P%d  %s  -  %s (costume %d)%s", s + 1, np_slot_name(s), syNetLobbyGetFighterName(f), c + 1,
-                            np_local_slot() == s ? "  <- you" : "");
+                ImGui::BulletText("P%d  %s  -  %s (costume %d)%s", s + 1, np_slot_name(s), syNetLobbyGetFighterName(f),
+                                  c + 1, np_local_slot() == s ? "   <- you" : "");
             }
         } else {
-            ImGui::TextDisabled("P%d  (empty)", s + 1);
+            ImGui::TextDisabled("    P%d  (empty)", s + 1);
         }
     }
-    ImGui::Separator();
+
     if (np_is_host()) {
-        // Switch mode without closing the room.
-        mode = np_get_mode();
-        int newMode = mode;
-        ImGui::Text("Game mode (you can change it anytime)");
-        ImGui::RadioButton("VS Mode", &newMode, 0);
-        ImGui::SameLine();
-        const bool can1P = np_player_count() <= 3;
-        if (!can1P) ImGui::BeginDisabled();
-        ImGui::RadioButton("1P Mode (co-op, experimental)", &newMode, 1);
-        if (!can1P) {
-            ImGui::EndDisabled();
-            ImGui::TextDisabled("1P Mode only allows up to 3 players: ask the extra player to leave first.");
-        }
-        if (newMode != mode) {
-            mode = newMode;
-            save();
-            np_set_mode(mode);
-            np_set_max_players(mode == 1 ? std::clamp(maxPlayers, 2, 3) : maxPlayers);
-        }
-        if (mode == 1) {
-            maxPlayers = std::clamp(maxPlayers, 2, 3);
-            if (ImGui::SliderInt("Max players (1P Mode)", &maxPlayers, (std::max)(2, np_player_count()), 3)) {
-                np_set_max_players(maxPlayers);
-                save();
-            }
-            ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.3f, 1.0f), "1P Mode only allows up to 3 players.");
-            static const char* kDiffs[] = { "Very Easy", "Easy", "Normal", "Hard", "Very Hard" };
-            difficulty = std::clamp(difficulty, 0, 4);
-            if (ImGui::BeginCombo("Difficulty", kDiffs[difficulty])) {
-                for (int i = 0; i < 5; i++) {
-                    if (ImGui::Selectable(kDiffs[i], i == difficulty)) difficulty = i;
-                }
-                ImGui::EndCombo();
-            }
-            lives = std::clamp(lives, 1, 5);
-            ImGui::SliderInt("Lives (stocks)", &lives, 1, 5);
-            ImGui::Checkbox("Friendly fire", &friendlyFire);
-            np_set_run_options(difficulty, lives - 1);
-            np_set_friendly_fire(friendlyFire ? 1 : 0);
-            save();
-        }
-        {
-            static const char* kCostumeLabels2[] = { "From character select", "Costume 1", "Costume 2", "Costume 3", "Costume 4" };
-            hostCostume = std::clamp(hostCostume, -1, 3);
-            if (ImGui::BeginCombo("Your costume (Player 1)", kCostumeLabels2[hostCostume + 1])) {
-                for (int i = -1; i < 4; i++) {
-                    if (ImGui::Selectable(kCostumeLabels2[i + 1], i == hostCostume)) { hostCostume = i; save(); }
-                }
-                ImGui::EndCombo();
-            }
-            np_set_host_costume(hostCostume);
-        }
-        ImGui::Separator();
+        NpHeader("You are the host");
+        bool costumeChanged = false;
+        int32_t hc = U.hostCostume;
+        if (UIWidgets::Combobox("Your costume (Player 1)", &hc, kNpCostumes)) { U.hostCostume = hc; costumeChanged = true; }
+        if (costumeChanged) { U.ApplyHost(); U.Save(); }
         if (np_get_mode() == 1) {
-            ImGui::TextWrapped("1P Mode: you are on the character select screen. Pick your fighter, then press "
-                               "Start. The difficulty and lives are the ones you chose in this menu before hosting "
-                               "(the ones on the character select screen are ignored online). Your friends are pulled "
-                               "into the run as Player 2 and 3 with the fighters they chose here. 1P Mode allows up to 3 players.");
+            ImGui::TextWrapped("1P Mode: you are on the character select screen. Pick your fighter, then press Start. "
+                               "Difficulty and lives come from \"Match Options\". Your friends join the run as Player 2 and 3.");
         } else {
-            ImGui::TextWrapped("VS Mode: go to the VS character select screen, pick P1 and the rules/stage, then press "
-                               "Start as usual: connected players are pulled into the match automatically "
-                               "with the fighter they chose here.");
+            ImGui::TextWrapped("VS Mode: go to the VS character select, pick P1 and the rules, then press Start. "
+                               "Connected players are pulled into the match with the fighter they chose. "
+                               "The stage can be forced from \"Match Options\".");
         }
     } else {
-        const int n = syNetLobbyGetFighterCount();
-        if (ImGui::BeginCombo("Your fighter", syNetLobbyGetFighterName(fighter))) {
-            for (int i = 0; i < n; i++) {
-                if (ImGui::Selectable(syNetLobbyGetFighterName(i), i == fighter)) {
-                    fighter = i;
-                    np_set_choice(fighter, costume);
-                    save();
-                }
-            }
-            ImGui::EndCombo();
-        }
-        if (ImGui::SliderInt("Costume", &costume, 0, 3)) {
-            np_set_choice(fighter, costume);
-            save();
-        }
+        NpHeader("Your fighter");
+        NpFighterPicker(true);
         ImGui::TextWrapped("Wait for the host to start the %s. Plug your controller into port 1.",
                            np_get_mode() == 1 ? "1P co-op run" : "match");
     }
-    if (ImGui::Button(np_is_host() ? "Close lobby" : "Leave")) {
+    UIWidgets::Spacer(6.0f);
+    if (UIWidgets::Button(np_is_host() ? "Close lobby" : "Leave",
+                          ButtonOptions().Size(Sizes::Inline).Color(Colors::Red).Tooltip("Leaves the room. Room cheats turn off."))) {
         np_stop();
     }
-    tutorial();
+}
+
+// "Match Options": everything the host decides. Editable before hosting and while the room is open.
+void RenderMatchOptions(WidgetInfo&) {
+    U.Load();
+    const int state = np_state();
+    const bool connected = (state == NP_CONNECTED);
+    const bool hosting = (state == NP_HOSTING);
+    if (connected) {
+        ImGui::TextWrapped("Only the host can change these options. Current room: %s, up to %d players.",
+                           np_get_mode() == 1 ? "1P Mode" : "VS Mode", np_get_max_players());
+        return;
+    }
+    bool dirty = false;
+
+    NpHeader("Game mode");
+    int32_t m = U.mode;
+    const std::map<int32_t, const char*> modes = { { 0, "VS Mode (fight each other)" }, { 1, "1P Mode (co-op, experimental)" } };
+    const bool can1P = !hosting || np_player_count() <= 3;
+    if (UIWidgets::Combobox("Mode", &m, modes,
+                            ComboboxOptions().Tooltip("VS Mode: 2-4 players fight each other. 1P Mode: up to 3 players play the story mode together."))) {
+        if (m == 0 || can1P) { U.mode = m; dirty = true; }
+    }
+    if (!can1P) ImGui::TextDisabled("1P Mode allows up to 3 players: ask the extra player to leave first.");
+
+    if (U.mode == 0) {
+        NpHeader("Stage (VS Mode)");
+        int32_t st = U.stage;
+        if (UIWidgets::Combobox("Stage", &st, kNpStages,
+                                ComboboxOptions().Tooltip("Forces the stage of the next match for everybody. "
+                                                          "\"Pick on the stage select screen\" keeps the normal behaviour."))) {
+            U.stage = st;
+            dirty = true;
+        }
+        U.maxPlayers = std::clamp(U.maxPlayers, 2, 4);
+        if (UIWidgets::SliderInt("Max players", &U.maxPlayers, IntSliderOptions().Min(2).Max(4).DefaultValue(4)
+                                                                  .Tooltip("How many people can be in the room."))) {
+            dirty = true;
+        }
+    } else {
+        NpHeader("Co-op run (1P Mode)");
+        U.maxPlayers = std::clamp(U.maxPlayers, 2, 3);
+        if (UIWidgets::SliderInt("Max players", &U.maxPlayers, IntSliderOptions().Min(hosting ? (std::max)(2, np_player_count()) : 2).Max(3)
+                                                                  .DefaultValue(3).Tooltip("1P Mode only allows up to 3 players."))) {
+            dirty = true;
+        }
+        int32_t d = std::clamp(U.difficulty, 0, 4);
+        if (UIWidgets::Combobox("Difficulty", &d, kNpDifficulty)) { U.difficulty = d; dirty = true; }
+        U.lives = std::clamp(U.lives, 1, 5);
+        if (UIWidgets::SliderInt("Lives (stocks)", &U.lives, IntSliderOptions().Min(1).Max(5).DefaultValue(3))) dirty = true;
+        if (NpCheck("Friendly fire", &U.friendlyFire, "Players can hurt each other.")) dirty = true;
+    }
+
+    NpHeader("Room cheats (optional)");
+    ImGui::TextWrapped("Applied to EVERYONE in the match and turned off when the room closes. Only the host chooses them.");
+    struct Cheat { const char* label; int bit; const char* tip; };
+    static const Cheat kCheats[] = {
+        { "Infinite jumps", 1, "Every player can jump in the air without limit." },
+        { "Infinite shield", 2, "Shields never break or shrink." },
+        { "Always 0% damage", 4, "Nobody takes damage (no knockback)." },
+        { "Infinite stocks / lives", 8, "Nobody loses stocks when they are KO'd." },
+        { "CPU fighters at 999%", 16, "Every CPU opponent sits at 999%." },
+    };
+    for (const Cheat& c : kCheats) {
+        bool on = (U.cheatMask & c.bit) != 0;
+        if (NpCheck(c.label, &on, c.tip)) {
+            U.cheatMask = on ? (U.cheatMask | c.bit) : (U.cheatMask & ~c.bit);
+            dirty = true;
+        }
+    }
+
+    NpHeader("Connection");
+    if (UIWidgets::SliderInt("Input delay (frames)", &U.delay, IntSliderOptions().Min(1).Max(12).DefaultValue(5)
+                                                                  .Tooltip("Higher = smoother over bad connections but more input lag. 4-6 is good on Radmin."))) {
+        dirty = true;
+    }
+    if (NpCheck("Show connected players on the character select panels", &U.showPanels,
+                "Experimental. If the character select screen glitches, turn this off (a name strip is shown instead).")) {
+        np_set_panels(U.showPanels ? 1 : 0);
+        dirty = true;
+    }
+    if (dirty) {
+        U.Save();
+        if (hosting) U.ApplyHost();
+    }
+}
+
+// "How to Play": the tutorial.
+void RenderNetHelp(WidgetInfo&) {
+    NpHeader("How it works");
+    ImGui::BulletText("The host is Player 1. Up to 3 friends can join as Player 2, 3 and 4.");
+    ImGui::BulletText("HOST: open \"LAN Online\", press \"Host game\" and share your IP (Radmin / LAN) and the port.");
+    ImGui::BulletText("JOINERS: type the host's IP and the same port, choose your fighter and press \"Join game\".");
+    ImGui::BulletText("HOST: choose the rules (and the stage in \"Match Options\" if you want), then press START.");
+    ImGui::BulletText("Each player uses their own controller on port 1 of their own PC.");
+    ImGui::BulletText("Lag or stuttering? The host can raise the input delay in \"Match Options\".");
+    ImGui::BulletText("If someone disconnects during a match, the match ends for everybody.");
+    ImGui::BulletText("VS Mode: 2 to 4 players fight each other.");
+    ImGui::BulletText("1P Mode (experimental): up to 3 players play the story mode together as allies.");
+    ImGui::BulletText("Room cheats chosen by the host apply to every player and vanish when the room closes.");
 }
 
 } // namespace
 
 void PortMenu::AddMenuNetplay() {
-    AddMenuEntry("Online", CVAR_SETTING("Menu.OnlineSidebarSection"));
-    WidgetPath path = { "Online", "Multiplayer", SECTION_COLUMN_1 };
-    AddSidebarEntry("Online", "Multiplayer", 1);
-    AddWidget(path, "Online / LAN Multiplayer (up to 4 players)", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Online Panel", WIDGET_CUSTOM).RaceDisable(false).CustomFunction(RenderNetplayPanel);
+    WidgetPath path = { "Network", "LAN Online", SECTION_COLUMN_1 };
+    AddSidebarEntry("Network", "LAN Online", 1);
+    AddWidget(path, "LAN Online (up to 4 players)", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "LAN Online Panel", WIDGET_CUSTOM).RaceDisable(false).CustomFunction(RenderLanOnline);
+
+    path.sidebarName = "Match Options";
+    AddSidebarEntry("Network", "Match Options", 1);
+    AddWidget(path, "Match Options", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Match Options Panel", WIDGET_CUSTOM).RaceDisable(false).CustomFunction(RenderMatchOptions);
+
+    path.sidebarName = "How to Play";
+    AddSidebarEntry("Network", "How to Play", 1);
+    AddWidget(path, "How to Play Online", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "How to Play Panel", WIDGET_CUSTOM).RaceDisable(false).CustomFunction(RenderNetHelp);
+}
+
+namespace {
+void OpenFolder(const std::string& dir) {
+#if defined(_WIN32)
+    std::string cmd = "explorer \"" + dir + "\"";
+#elif defined(__APPLE__)
+    std::string cmd = "open \"" + dir + "\"";
+#else
+    std::string cmd = "xdg-open \"" + dir + "\" >/dev/null 2>&1 &";
+#endif
+    (void)std::system(cmd.c_str());
+}
+
+void RenderDiagnostics(WidgetInfo&) {
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::Text("Frame rate: %.1f FPS  (%.2f ms/frame)", io.Framerate, io.Framerate > 0.0f ? 1000.0f / io.Framerate : 0.0f);
+    ImGui::Text("Display: %.0f x %.0f", io.DisplaySize.x, io.DisplaySize.y);
+    ImGui::Text("Version: %s", BATTLESHIP_CURRENT_VERSION);
+    ImGui::Text("App directory: %s", Ship::Context::GetPathRelativeToAppDirectory("").c_str());
+    ImGui::Text("Music tracks found: %d", portMusicTrackCount());
+    ImGui::Text("Online room: %s", syNetLobbyIsRoomOpen() ? "open" : "closed");
+}
+
+void RenderDevUtilities(WidgetInfo&) {
+    const std::string app = Ship::Context::GetPathRelativeToAppDirectory("");
+    const std::string mods = Ship::Context::GetPathRelativeToAppDirectory("mods");
+    if (UIWidgets::Button("Open app folder", ButtonOptions().Size(Sizes::Inline).Tooltip("Opens the folder with BattleShip.o2r, saves and config."))) {
+        OpenFolder(app);
+    }
+    ImGui::SameLine();
+    if (UIWidgets::Button("Open mods folder", ButtonOptions().Size(Sizes::Inline).Tooltip("Opens the mods folder (texture packs, music, script mods)."))) {
+        std::error_code ec;
+        fs::create_directories(mods, ec);
+        OpenFolder(mods);
+    }
+    UIWidgets::Spacer(4.0f);
+    if (UIWidgets::Button("Rescan music", ButtonOptions().Size(Sizes::Inline).Tooltip("Looks again for replacement music in the mods folders."))) {
+        portMusicRescan();
+    }
+    ImGui::SameLine();
+    if (UIWidgets::Button("Save settings now", ButtonOptions().Size(Sizes::Inline).Tooltip("Writes the configuration file immediately."))) {
+        Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+    UIWidgets::Spacer(4.0f);
+    if (UIWidgets::Button("Turn off all gameplay cheats", ButtonOptions().Size(Sizes::Inline).Color(Colors::Red)
+                                                               .Tooltip("Disables every gameplay cheat checkbox."))) {
+        const char* names[] = { "gCheats.Gameplay", "gCheats.InfiniteJumps", "gCheats.InfiniteShield",
+                                "gCheats.ZeroPercent", "gCheats.InfiniteStocks", "gCheats.Enemy999" };
+        for (const char* n : names) CVarSetInteger(n, 0);
+        Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+}
+
+void RenderNetDebug(WidgetInfo&) {
+    static const char* kStateNames[] = { "Idle", "Hosting", "Connecting", "Connected", "Failed" };
+    const int st = np_state();
+    ImGui::Text("State: %s", (st >= 0 && st < 5) ? kStateNames[st] : "?");
+    ImGui::Text("Status: %s", np_status());
+    ImGui::Text("Role: %s   Local slot: %d", np_is_host() ? "host" : "client", np_local_slot());
+    ImGui::Text("Players connected: %d", np_player_count());
+    ImGui::Text("Input delay: %d frames", np_get_input_delay());
+    ImGui::Text("Match active: %s   mask: 0x%X", np_match_active() ? "yes" : "no", np_match_mask());
+    ImGui::Text("Room cheats (match): 0x%02X   (host setting: 0x%02X)", np_match_cheats(), np_get_room_cheats());
+    ImGui::Text("Forced stage: %d  (-1 = stage select, -2 = random)", np_get_stage());
+    ImGui::Text("Settings hash: %08X", np_settings_hash());
+    ImGui::TextDisabled("The settings hash must be identical on every peer.");
+}
+} // namespace
+
+void PortMenu::AddMenuDevTools() {
+    WidgetPath path = { "Dev Tools", "Diagnostics", SECTION_COLUMN_1 };
+    AddSidebarEntry("Dev Tools", "Diagnostics", 1);
+    AddWidget(path, "Diagnostics", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Diagnostics Panel", WIDGET_CUSTOM).RaceDisable(false).CustomFunction(RenderDiagnostics);
+
+    path.sidebarName = "Netplay Debug";
+    AddSidebarEntry("Dev Tools", "Netplay Debug", 1);
+    AddWidget(path, "Netplay Debug", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Netplay Debug Panel", WIDGET_CUSTOM).RaceDisable(false).CustomFunction(RenderNetDebug);
+
+    path.sidebarName = "Utilities";
+    AddSidebarEntry("Dev Tools", "Utilities", 1);
+    AddWidget(path, "Utilities", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "Utilities Panel", WIDGET_CUSTOM).RaceDisable(false).CustomFunction(RenderDevUtilities);
 }
 
 void PortMenu::AddMenuAbout() {
-    AddMenuEntry("About", CVAR_SETTING("Menu.AboutSidebarSection"));
+    WidgetPath path = { "About", "BattleShipDX", SECTION_COLUMN_1 };
+    AddSidebarEntry("About", "BattleShipDX", 1);
+    AddWidget(path, "BattleShipDX", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "A modification of BattleShip (JRickey/BattleShip), the native Smash 64 PC port.", WIDGET_TEXT);
+#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
+    AddWidget(path, "Version: " + std::string(ssb64::enhancements::GetDxVersion()), WIDGET_TEXT);
+#else
+    AddWidget(path, "Version: " + std::string(BATTLESHIP_CURRENT_VERSION), WIDGET_TEXT);
+#endif
+    AddWidget(path, "BattleShipDX is a fan-made fork. It keeps everything the original port does and adds:", WIDGET_TEXT);
 
-    // revamped credits menu
-    WidgetPath path = { "About", "Build", SECTION_COLUMN_1 };
-    AddSidebarEntry("About", "Build", 1);
-    AddWidget(path, "About", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "BattleShip", WIDGET_TEXT);
+    AddWidget(path, "What BattleShipDX adds", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "LAN / online multiplayer for 2 to 4 players (Radmin, Hamachi or LAN), with name tags", WIDGET_TEXT);
+    AddWidget(path, "1P Mode online co-op (up to 3 players) with optional friendly fire", WIDGET_TEXT);
+    AddWidget(path, "Host-chosen stage and room cheats that apply to everybody in the match", WIDGET_TEXT);
+    AddWidget(path, "Desync detection and a transport self-test", WIDGET_TEXT);
+    AddWidget(path, "Music replacement with MP3 / OGG / WAV from the mods folder, a zip or an .o2r", WIDGET_TEXT);
+    AddWidget(path, "Audio Editor: choose the music of every stage, swap in-game songs or randomize", WIDGET_TEXT);
+    AddWidget(path, "Gameplay cheats (infinite jumps, shield, stocks, 0% damage, CPU at 999%)", WIDGET_TEXT);
+    AddWidget(path, "Hi-res texture packs from .zip and .o2r files", WIDGET_TEXT);
+    AddWidget(path, "Web asset editor (textures, 3D levels, music) for your BattleShip.o2r", WIDGET_TEXT);
+    AddWidget(path, "Reorganised menu: Settings, Enhancements, Controls, Network, Dev Tools, About", WIDGET_TEXT);
+
+    path.sidebarName = "Credits";
+    AddSidebarEntry("About", "Credits", 1);
+    AddWidget(path, "Original BattleShip", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "BattleShipDX is built on BattleShip: all credit for the port goes to its authors.", WIDGET_TEXT);
     AddWidget(path, "Native Smash 64 PC port powered by libultraship", WIDGET_TEXT);
     AddWidget(path, "Built from the ssb-decomp-re decompilation", WIDGET_TEXT);
-
-    AddWidget(path, "Credits", WIDGET_SEPARATOR_TEXT);
     AddWidget(path, "JRickey: Lead Developer", WIDGET_TEXT);
     AddWidget(path, "Jameriquiah: Developer", WIDGET_TEXT);
     AddWidget(path, "the-outcaster: Developer", WIDGET_TEXT);
@@ -2088,81 +2261,19 @@ void PortMenu::AddMenuAbout() {
     AddWidget(path, "ElBateSoli: Raphnet Playtesting", WIDGET_TEXT);
     AddWidget(path, "MickleMoose: C Modding Toolkit Developer", WIDGET_TEXT);
     AddWidget(path, "Zorkats: C Modding Documentation", WIDGET_TEXT);
-
-
-#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
-    // BUILT-IN UPDATER — hidden on Android. App updates come through the
-    // Play Store on mobile; a curl-driven GitHub-releases updater can't
-    // replace a system-managed installation, and the curl shell-out
-    // (Updater.cpp) isn't built on Android in the first place.
-    // The background check still fires when the menu loads
-    ssb64::enhancements::CheckForUpdatesAsync(false);
-
-    AddWidget(path, "Updates", WIDGET_SEPARATOR_TEXT);
-    AddWidget(path, "Version: " + std::string(BATTLESHIP_CURRENT_VERSION), WIDGET_TEXT);
-
-    // 1. "Checking for updates..." Text
-    AddWidget(path, "Checking for updates...", WIDGET_TEXT)
-    .PreFunc([](WidgetInfo& info) {
-        info.isHidden = !ssb64::enhancements::IsCheckingForUpdates();
-    });
-
-    // 2. "Download Update" Button
-    AddWidget(path, "Download Update", WIDGET_BUTTON)
-    .RaceDisable(false)
-    .PreFunc([](WidgetInfo& info) {
-        info.isHidden = ssb64::enhancements::IsCheckingForUpdates() ||
-        ssb64::enhancements::IsDownloading() ||
-        ssb64::enhancements::IsDownloadComplete() ||
-        !ssb64::enhancements::IsUpdateAvailable();
-
-        if (!info.isHidden) {
-            info.name = "Download Update: " + ssb64::enhancements::GetLatestVersion();
-        }
-    })
-    .Callback([](WidgetInfo&) {
-        ssb64::enhancements::StartGameUpdate();
-    });
-
-    // 3. "Downloading... XX%" Text (Also handles the "Complete" text)
-    AddWidget(path, "Download Status", WIDGET_TEXT)
-    .PreFunc([](WidgetInfo& info) {
-        info.isHidden = !ssb64::enhancements::IsDownloading() && !ssb64::enhancements::IsDownloadComplete();
-        if (!info.isHidden) {
-            // Pipe the curl progress bar or completion string straight to the UI
-            info.name = ssb64::enhancements::GetDownloadStatus();
-        }
-    });
-
-    // 4. Update result text
-    AddWidget(path, "Update Status", WIDGET_TEXT)
-    .PreFunc([](WidgetInfo& info) {
-        const std::string status = ssb64::enhancements::GetUpdateStatus();
-        info.isHidden = ssb64::enhancements::IsCheckingForUpdates() ||
-                        ssb64::enhancements::IsUpdateAvailable() ||
-                        status.empty();
-        if (!info.isHidden) {
-            info.name = status;
-        }
-    });
-
-    // 5. "Check for Updates" Manual Button
-    AddWidget(path, "Check for Updates", WIDGET_BUTTON)
-    .RaceDisable(false)
-    .PreFunc([](WidgetInfo& info) {
-        // Hide this button while checking or downloading so they can't spam it
-        info.isHidden = ssb64::enhancements::IsCheckingForUpdates() ||
-        ssb64::enhancements::IsDownloading() ||
-        ssb64::enhancements::IsDownloadComplete();
-    })
-    .Callback([](WidgetInfo&) {
-        // Pass true to bypass the single-session lock
-        ssb64::enhancements::CheckForUpdatesAsync(true);
-    });
-#endif // !__ANDROID__ (Updater)
+    AddWidget(path, "Third-party code", WIDGET_SEPARATOR_TEXT);
+    AddWidget(path, "minimp3 (CC0) and stb_vorbis (public domain) decode the replacement music.", WIDGET_TEXT);
 }
 
 void PortMenu::AddMenuElements() {
+    // Top bar order: Settings, Enhancements, Controls, Network, Dev Tools, About.
+    AddMenuEntry("Settings", CVAR_SETTING("Menu.SettingsSidebarSection"));
+    AddMenuEntry("Enhancements", CVAR_SETTING("Menu.EnhancementsSidebarSection"));
+    AddMenuEntry("Controls", CVAR_SETTING("Menu.ControlsSidebarSection"));
+    AddMenuEntry("Network", CVAR_SETTING("Menu.NetworkSidebarSection"));
+    AddMenuEntry("Dev Tools", CVAR_SETTING("Menu.DevToolsSidebarSection"));
+    AddMenuEntry("About", CVAR_SETTING("Menu.AboutSidebarSection"));
+
     AddMenuSettings();
     AddMenuNetplay();
     AddMenuAssets();
@@ -2170,7 +2281,12 @@ void PortMenu::AddMenuElements() {
     AddMenuMods();
     AddMenuAudioEditor();
 #endif
+    AddMenuDevTools();
     AddMenuAbout();
+
+#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
+    ssb64::enhancements::CheckForDxReleaseAsync(); // background check for a newer BattleShipDX release
+#endif
 
     if (CVarGetInteger(CVAR_SETTING("Menu.SidebarSearch"), 0)) {
         InsertSidebarSearch();
@@ -2386,6 +2502,32 @@ void PortMenu::DrawElement() {
     if (mMenuElementsInitialized) {
         Ship::Menu::DrawElement();
     }
+
+#if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
+    // "New update released" notice, top right. Click opens the GitHub releases page.
+    if (ssb64::enhancements::IsDxReleaseAvailable()) {
+        const std::string text = "A new BattleShipDX update was released (" + ssb64::enhancements::GetDxLatestTag() +
+                                 ") - click here to download it";
+        const ImGuiViewport* vp = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + vp->Size.x - 12.0f, vp->Pos.y + 10.0f), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+        ImGui::SetNextWindowBgAlpha(0.75f);
+        const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
+        if (ImGui::Begin("##BattleShipDXUpdateNotice", nullptr, flags)) {
+            const bool hovered = ImGui::IsWindowHovered();
+            ImGui::TextColored(hovered ? ImVec4(1.0f, 1.0f, 0.5f, 1.0f) : ImVec4(0.45f, 1.0f, 0.55f, 1.0f), "%s", text.c_str());
+            if (hovered) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                ImGui::SetTooltip("Open https://github.com/JuanFunkin/BattleShipDX/releases");
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    ssb64::enhancements::OpenDxReleasesPage();
+                }
+            }
+        }
+        ImGui::End();
+    }
+#endif
 
     // Re-extract confirmation: render as an in-context ImGui modal rather
     // than calling SDL_ShowSimpleMessageBox, which would nest a blocking

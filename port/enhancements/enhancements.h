@@ -124,6 +124,13 @@ std::string GetUpdateStatus();
 std::string GetDownloadStatus();
 std::string GetLatestVersion();
 
+// BattleShipDX release notice (top right of the menu; compares against GitHub releases).
+void CheckForDxReleaseAsync();   // once per session, background thread
+bool IsDxReleaseAvailable();
+std::string GetDxLatestTag();
+const char* GetDxVersion();
+void OpenDxReleasesPage();
+
 // Libretro shader pack downloader. Two-phase background flow:
 //
 //   1. FetchShaderPackCatalogAsync() pulls libretro/glsl-shaders'

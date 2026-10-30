@@ -11,6 +11,8 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
+#include <algorithm>
 
 #include <nlohmann/json.hpp>
 
@@ -469,6 +471,82 @@ void OpenReleasePage() {
                       ShellSingleQuote(url) + " &";
     system(cmd.c_str());
     #endif
+}
+
+// ---------------------------------------------------------------------------
+// BattleShipDX release notice: tells the player (top right of the menu) that a newer release
+// exists on https://github.com/JuanFunkin/BattleShipDX/releases and opens that page on click.
+// Bump BATTLESHIPDX_VERSION below when you publish a release (it must match the release tag).
+// ---------------------------------------------------------------------------
+#ifndef BATTLESHIPDX_VERSION
+#define BATTLESHIPDX_VERSION "v1.0.0"
+#endif
+static constexpr const char* kDxLatestApi = "https://api.github.com/repos/JuanFunkin/BattleShipDX/releases/latest";
+static constexpr const char* kDxReleasesUrl = "https://github.com/JuanFunkin/BattleShipDX/releases";
+static std::atomic<bool> s_dxChecked{false};
+static std::atomic<bool> s_dxNewer{false};
+static std::string s_dxLatestTag;
+
+static std::vector<int> ParseVersionNumbers(const std::string& v) {
+    std::vector<int> out;
+    int cur = -1;
+    for (char c : v) {
+        if (c >= '0' && c <= '9') { cur = (cur < 0 ? 0 : cur) * 10 + (c - '0'); }
+        else { if (cur >= 0) out.push_back(cur); cur = -1; if (c == '-' || c == '+') break; }
+    }
+    if (cur >= 0) out.push_back(cur);
+    return out;
+}
+
+static bool IsVersionNewer(const std::string& latest, const std::string& current) {
+    const auto a = ParseVersionNumbers(latest);
+    const auto b = ParseVersionNumbers(current);
+    if (a.empty() || b.empty()) return false;
+    for (size_t i = 0; i < (std::max)(a.size(), b.size()); i++) {
+        const int x = i < a.size() ? a[i] : 0;
+        const int y = i < b.size() ? b[i] : 0;
+        if (x != y) return x > y;
+    }
+    return false;
+}
+
+void CheckForDxReleaseAsync() {
+    if (s_dxChecked.exchange(true)) return; // once per session
+    std::thread([]() {
+        std::string response;
+#if defined(_WIN32)
+        const std::string cmd = std::string("curl -fLsS -m 10 -H \"User-Agent: BattleShipDX\" \"") + kDxLatestApi + "\"";
+#else
+        const std::string cmd = CurlCommandPrefix() + " -fLsS -m 10 -H " + ShellSingleQuote("User-Agent: BattleShipDX") +
+                                " " + ShellSingleQuote(kDxLatestApi) + " 2>/dev/null";
+#endif
+        if (RunCapture(cmd, [&](const std::string& line) { response += line; }) != 0 || response.empty()) return;
+        try {
+            auto release = nlohmann::json::parse(response);
+            if (!release.contains("tag_name") || !release["tag_name"].is_string()) return;
+            const std::string tag = release["tag_name"].get<std::string>();
+            if (IsVersionNewer(tag, BATTLESHIPDX_VERSION)) {
+                { std::lock_guard<std::mutex> lock(s_stringMutex); s_dxLatestTag = tag; }
+                s_dxNewer.store(true);
+                port_log("SSB64 Update: new BattleShipDX release %s (running %s)\n", tag.c_str(), BATTLESHIPDX_VERSION);
+            }
+        } catch (...) {
+        }
+    }).detach();
+}
+
+bool IsDxReleaseAvailable() { return s_dxNewer.load(); }
+std::string GetDxLatestTag() { std::lock_guard<std::mutex> lock(s_stringMutex); return s_dxLatestTag; }
+const char* GetDxVersion() { return BATTLESHIPDX_VERSION; }
+
+void OpenDxReleasesPage() {
+#if defined(_WIN32)
+    ShellExecuteA(nullptr, "open", kDxReleasesUrl, nullptr, nullptr, SW_SHOWNORMAL);
+#elif defined(__APPLE__)
+    (void)std::system((std::string("open ") + kDxReleasesUrl + " >/dev/null 2>&1 &").c_str());
+#else
+    (void)std::system((std::string("env -u LD_LIBRARY_PATH -u LD_PRELOAD xdg-open ") + kDxReleasesUrl + " >/dev/null 2>&1 &").c_str());
+#endif
 }
 
 // Atomic reads - no locks required for the UI thread!

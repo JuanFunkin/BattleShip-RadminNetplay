@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+#include <cstdlib>
 #include "netplay.h"
 #include "netplay_session.hpp"
 
@@ -62,6 +63,16 @@ int np_get_friendly_fire(void) { return sFriendlyFire; }
 static int sHostCostume = -1;
 void np_set_host_costume(int c) { sHostCostume = (c < 0) ? -1 : (c & 3); }
 int np_get_host_costume(void) { return sHostCostume; }
+void np_set_room_cheats(int m) { S().SetRoomCheats(m); }
+int np_get_room_cheats(void) { return S().RoomCheats(); }
+int np_match_cheats(void) { return S().MatchCheats(); }
+static int sStage = -1; // -1 = chosen on the stage select screen, -2 = random, >=0 = GRKind
+void np_set_stage(int k) { sStage = k; }
+int np_get_stage(void) { return sStage; }
+int np_resolve_stage(void) {
+    if (sStage == -2) return std::rand() % 9; // Castle..Mushroom Kingdom (host only: the result is sent to everybody)
+    return sStage;
+}
 static int sPanels = 1;
 void np_set_panels(int on) { sPanels = on ? 1 : 0; }
 int np_get_panels(void) { return sPanels; }

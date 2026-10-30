@@ -259,12 +259,42 @@ const Source* ResolveTrack(unsigned bgm) {
 
 } // namespace
 
+static int gRemap[kPlayers] = { -1, -1 };  // in-game song chosen to replace the requested one (Audio Editor "swap")
+static const int kGameSongs = 47;          // number of original BGM ids
+
 extern "C" int portMusicPlay(int player, unsigned int bgm) {
     if (player < 0 || player >= kPlayers) return 0;
+    gRemap[player] = -1;
     if (CVarGetInteger("gMusicOverride.Enabled", 1) == 0) { portMusicStop(player); return 0; }
     std::lock_guard<std::mutex> lk(gMu);
     EnsureScanned();
-    const Source* src = ResolveTrack(bgm);
+    const Source* src = nullptr;
+    {
+        // Swap with another song of the game: "game:<id>"; "any": random between the game's songs and the custom files.
+        char cv[48];
+        std::snprintf(cv, sizeof(cv), "gMusicOverride.Sel.%u", bgm);
+        const std::string sel = CVarGetString(cv, "");
+        if (sel.rfind("game:", 0) == 0) {
+            const int id = std::atoi(sel.c_str() + 5);
+            if (id >= 0 && id < kGameSongs) gRemap[player] = id;
+            gStreams[player].active = false;
+            return 0;
+        }
+        if (sel == "any") {
+            static unsigned sSeed2 = 98765u;
+            sSeed2 = sSeed2 * 1664525u + 1013904223u + (unsigned)std::clock();
+            const unsigned total = (unsigned)kGameSongs + (unsigned)gTracks.size();
+            const unsigned pick = (sSeed2 >> 8) % total;
+            if (pick < (unsigned)kGameSongs) {
+                gRemap[player] = (int)pick;
+                gStreams[player].active = false;
+                return 0;
+            }
+            src = &gTracks[pick - (unsigned)kGameSongs];
+        } else {
+            src = ResolveTrack(bgm);
+        }
+    }
     if (!src) { gStreams[player].active = false; return 0; }
     const std::string ckey = src->path + "|" + src->member;
     std::shared_ptr<Track> t;
@@ -285,6 +315,14 @@ extern "C" int portMusicPlay(int player, unsigned int bgm) {
     gStreams[player].active = true;
     port_log("SSB64 Music: playing '%s' for bgm %u\n", src->name.c_str(), bgm);
     return 1;
+}
+
+// After portMusicPlay() returned 0: the original sequence to play instead of `bgm` (same id when there is no swap).
+extern "C" unsigned int portMusicGameRemap(int player, unsigned int bgm) {
+    if (player < 0 || player >= kPlayers) return bgm;
+    const int r = gRemap[player];
+    gRemap[player] = -1;
+    return r >= 0 ? (unsigned)r : bgm;
 }
 
 extern "C" int portMusicTrackCount(void) {

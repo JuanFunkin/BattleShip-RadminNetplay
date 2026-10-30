@@ -83,6 +83,9 @@ class Session {
     bool MatchActive() const { return mMatchActive; }
     int MatchMask() const { return mMatchMask; }      // bit i => slot i plays
     int MatchDelay() const { return mMatchDelay; }
+    void SetRoomCheats(int m) { mRoomCheats = m & 0xFF; }   // host: cheats applied to everybody in the next match
+    int RoomCheats() const { return mRoomCheats; }
+    int MatchCheats() const { return mMatchActive ? mMatchCheats : 0; }
     void Ready();                   // local side finished loading
     bool StartReleased() const { return mReleased; }
     void EndMatch();                // keeps relaying inputs briefly
@@ -117,6 +120,8 @@ class Session {
     bool mMatchActive = false;
     int mMatchMask = 0;
     int mMatchDelay = 5;
+    int mRoomCheats = 0;
+    int mMatchCheats = 0;
     bool mReleased = false;
 };
 

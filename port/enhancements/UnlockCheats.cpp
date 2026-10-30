@@ -3,6 +3,7 @@
 #include <libultraship/bridge/consolevariablebridge.h>
 
 extern "C" int syNetLobbyIsRoomOpen(void);
+extern "C" int np_match_cheats(void);
 
 extern "C" {
     int port_cheat_unlock_all()        { return CVarGetInteger("gCheats.UnlockAll", 0); }
@@ -21,12 +22,17 @@ extern "C" {
                port_cheat_unlock_soundtest() | port_cheat_unlock_itemswitch();
     }
 
-    // Gameplay cheats are local-only: they would desync an online match, so they
-    // switch themselves off while an online room is open.
-    int port_cheat_gameplay_enabled()  { return CVarGetInteger("gCheats.Gameplay", 0) && !syNetLobbyIsRoomOpen(); }
-    int port_cheat_infinite_jumps()    { return CVarGetInteger("gCheats.InfiniteJumps", 0); }
-    int port_cheat_infinite_shield()   { return CVarGetInteger("gCheats.InfiniteShield", 0); }
-    int port_cheat_zero_percent()      { return CVarGetInteger("gCheats.ZeroPercent", 0); }
-    int port_cheat_infinite_stocks()   { return CVarGetInteger("gCheats.InfiniteStocks", 0); }
-    int port_cheat_enemy_999()         { return CVarGetInteger("gCheats.Enemy999", 0); }
+    // Gameplay cheats. Offline they come from the local CVars. In an online room the host's
+    // choice (sent with the match config, identical on every peer) is used instead and the local
+    // CVars are ignored, so nobody desyncs; everything switches off when the room closes.
+    static int cheat(int bit, const char* cvar) {
+        if (syNetLobbyIsRoomOpen()) return (np_match_cheats() & bit) != 0;
+        return CVarGetInteger("gCheats.Gameplay", 0) && CVarGetInteger(cvar, 0);
+    }
+    int port_cheat_gameplay_enabled()  { return syNetLobbyIsRoomOpen() ? (np_match_cheats() != 0) : CVarGetInteger("gCheats.Gameplay", 0); }
+    int port_cheat_infinite_jumps()    { return cheat(1,  "gCheats.InfiniteJumps"); }
+    int port_cheat_infinite_shield()   { return cheat(2,  "gCheats.InfiniteShield"); }
+    int port_cheat_zero_percent()      { return cheat(4,  "gCheats.ZeroPercent"); }
+    int port_cheat_infinite_stocks()   { return cheat(8,  "gCheats.InfiniteStocks"); }
+    int port_cheat_enemy_999()         { return cheat(16, "gCheats.Enemy999"); }
 }

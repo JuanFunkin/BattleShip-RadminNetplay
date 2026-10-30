@@ -923,21 +923,22 @@ index 6c8e8bd..44a31ec 100644
  };
  
 diff --git a/src/sys/audio.c b/src/sys/audio.c
-index 0db5b47..60bacda 100644
+index 0db5b47..993931d 100644
 --- a/src/sys/audio.c
 +++ b/src/sys/audio.c
-@@ -15,6 +15,10 @@
+@@ -15,6 +15,11 @@
  extern void func_80026738_27338(void *arg0);
  extern void func_800266A0_272A0(void);
  extern void func_80026204_26E04(void *arg0);
 +// music_override.cpp (mods/music)
 +extern int portMusicPlay(int player, u32 bgm);
 +extern void portMusicStop(int player);
++extern u32 portMusicGameRemap(int player, u32 bgm);
 +extern void portMusicSetVolume(int player, u32 vol);
  #endif
  
  extern SYAudioSettings dSYAudioPublicSettings2, dSYAudioPublicSettings3;
-@@ -1266,6 +1270,7 @@ void syAudioThreadMain(void *arg)
+@@ -1266,6 +1271,7 @@ void syAudioThreadMain(void *arg)
                          sSYAudioBGMVolumes[port_i] = 30720.0F;
                      }
                      n_alCSPSetVol(gSYAudioCSPlayers[port_i], sSYAudioBGMVolumes[port_i]);
@@ -945,7 +946,7 @@ index 0db5b47..60bacda 100644
                  }
              }
  
-@@ -1493,6 +1498,9 @@ void syAudioThreadMain(void *arg)
+@@ -1493,6 +1499,9 @@ void syAudioThreadMain(void *arg)
                      sSYAudioBGMVolumes[i] = 30720.0F;
                  }
                  n_alCSPSetVol(gSYAudioCSPlayers[i], sSYAudioBGMVolumes[i]);
@@ -955,7 +956,7 @@ index 0db5b47..60bacda 100644
              }
          }
          if (dSYAudioIsSettingsUpdated != FALSE)
-@@ -1666,6 +1674,15 @@ s32 syAudioPlayBGM(s32 sngplayer, u32 bgm)
+@@ -1666,6 +1675,16 @@ s32 syAudioPlayBGM(s32 sngplayer, u32 bgm)
  
      bgm = port_enhancement_shuffle_music(bgm); // music shuffler
  
@@ -967,11 +968,12 @@ index 0db5b47..60bacda 100644
 +
 +        return bgm;
 +    }
++    bgm = portMusicGameRemap(sngplayer, bgm); /* Audio Editor: play another song of the game here */
 +
  #endif
      if (bgm < sSYAudioSeqFile->seqCount)
      {
-@@ -1680,6 +1697,9 @@ s32 syAudioPlayBGM(s32 sngplayer, u32 bgm)
+@@ -1680,6 +1699,9 @@ s32 syAudioPlayBGM(s32 sngplayer, u32 bgm)
  // 0x80020B08
  void syAudioStopBGM(s32 sngplayer)
  {
@@ -981,7 +983,7 @@ index 0db5b47..60bacda 100644
      sSYAudioCSPlayerStatuses[sngplayer] = AL_PLAYING;
      sSYAudioBGMPlayingIDs[sngplayer] = -1;
  }
-@@ -1692,6 +1712,9 @@ void syAudioSetBGMVolume(s32 sngplayer, u32 vol)
+@@ -1692,6 +1714,9 @@ void syAudioSetBGMVolume(s32 sngplayer, u32 vol)
          vol = 30720;
      }
      n_alCSPSetVol(gSYAudioCSPlayers[sngplayer], vol);
@@ -1108,10 +1110,10 @@ index c6ecef7..61855d6 100644
  
 diff --git a/src/sys/netlobby.c b/src/sys/netlobby.c
 new file mode 100644
-index 0000000..79b0a27
+index 0000000..0c882d8
 --- /dev/null
 +++ b/src/sys/netlobby.c
-@@ -0,0 +1,844 @@
+@@ -0,0 +1,853 @@
 +#include <sys/netlobby.h>
 +
 +#ifdef PORT
@@ -1538,6 +1540,15 @@ index 0000000..79b0a27
 +	if ((sSYNetLobbyIsMatch != FALSE) || (np_state() != NP_HOSTING) || (np_player_count() < 2))
 +	{
 +		return;
++	}
++	{
++		int stage = np_resolve_stage(); /* stage picked in the Network menu (host) */
++
++		if (stage >= 0)
++		{
++			gSCManagerSceneData.gkind = stage;
++			gSCManagerBattleState->gkind = stage;
++		}
 +	}
 +	for (slot = 1; slot < MAXCONTROLLERS; slot++)
 +	{

@@ -2,14 +2,12 @@
   <img src="assets/BattleShip.svg" alt="BattleShip" width="640">
 </p>
 
-*Original BattleShip: https://github.com/JRickey/BattleShip https://discord.gg/bAE73kxKXY*
-
 # BattleShipDX
 
 **BattleShipDX** is a modified version of [**BattleShip**](https://github.com/JRickey/BattleShip) by JRickey, the PC port of **Super Smash Bros. (N64)** built on the [ssb-decomp-re](https://github.com/vetritheretri/ssb-decomp-re) decompilation with [libultraship](https://github.com/Kenix3/libultraship) and [Torch](https://github.com/HarbourMasters/Torch). It is **not** the original project: everything BattleShip does is still here, plus the extra features listed in [What BattleShipDX adds](#what-battleshipdx-adds). All credit for the port itself goes to JRickey and the upstream contributors.
 
-- A Assets Editor for the port: juanfunkin.github.io/BattleShipDX/
-- For now this version is only for **Windows**
+- **Online asset editor (runs in your browser):** see [`web/`](web/index.html). Once GitHub Pages is enabled for this repository it is published at `https://<your-user>.github.io/<repo-name>/`.
+- Runs natively on macOS (Apple Silicon), Linux, Windows, and Android (same targets as upstream; the DX additions are developed and tested mainly on Windows).
 
 Download the high resolution texture pack from [GhostlyDark](https://github.com/GhostlyDark) [here!](https://evilgames.eu/texture-packs/ssb-reloaded.htm#pc)
 
@@ -24,20 +22,28 @@ Keep this list up to date: every new feature gets a line here.
 - **Host costume selector**, **name tags** above fighters, **connected-player panels** on the character select screen.
 - **Desync detection** (state hashes + `SSB64 NetSync` log lines) and syncing of the host's save data/settings so unlock differences don't desync 1P runs.
 - Local ports 2–4 are disabled while a room is open.
+- **Host-chosen stage** for VS Mode (or random), selectable before and while the room is open (Network → Match Options).
+- **Room cheats**: the host can enable infinite jumps / shield / stocks, 0% damage or CPU at 999% for *everyone* in the match; they turn off when the room closes.
 - Details and update log: [`docs/netplay.md`](docs/netplay.md).
 
 ### Music: replace any track with MP3 / OGG / WAV
 
 - Drop `music/<track>.mp3|ogg|wav` into the `mods` folder, or inside any `.zip` / `.o2r` there.
-- **Audio Editor** menu (Assets → Audio Editor): choose Default / Original / Random / any custom file for every in-game track.
+- **Audio Editor** menu (Enhancements → Audio Editor): for every in-game track choose Default / Original / a custom file / **another song of the game** (e.g. Mushroom Kingdom's music on Dream Land) / Random (any song) / Random custom file.
 
-### Gameplay cheats (offline only)
+### Gameplay cheats
 
-- Infinite jumps, infinite shield, always 0%, infinite stocks/lives, CPU fighters at 999% (Settings → Cheats). They switch off automatically in online rooms.
+- Infinite jumps, infinite shield, always 0%, infinite stocks/lives, CPU fighters at 999% (Enhancements → Cheats). Offline they use your own settings; in an online room only the host's room cheats apply (same for everybody).
+
+### Menu
+
+- Reorganised top bar: **Settings, Enhancements, Controls, Network, Dev Tools, About**. Mods live in Settings, Audio Editor and Cheats in Enhancements, input mapping in Controls, extraction/paths/diagnostics/netplay debug in Dev Tools, and a BattleShipDX About page with the original credits.
+- **New-release notice**: when a newer release is published on GitHub, the menu shows a clickable message at the top right that opens the releases page. (When you publish a release, set `BATTLESHIPDX_VERSION` in `port/enhancements/Updater.cpp` to the same tag.)
+- **Network → LAN Online / Match Options / How to Play**, laid out like the Ship of Harkinian menus.
 
 ### Mod and texture tooling
 
-- **Asset editor in the browser** juanfunkin.github.io/BattleShipDX/ English / Español): open your own `BattleShip.o2r`, browse all textures and menu sprites, view stages and fighter models in 3D, replace textures, and export a hi-res pack (`.zip` or `.o2r`) or a music pack. Everything runs locally; nothing is uploaded.
+- **Asset editor in the browser** ([`web/`](web/index.html), English / Español): open your own `BattleShip.o2r`, browse all textures and menu sprites, view stages and fighter models in 3D, replace textures, and export a hi-res pack (`.zip` or `.o2r`) or a music pack. Everything runs locally; nothing is uploaded.
 - Hi-res texture packs can now also be `.o2r` files. The `mods` folders are created automatically.
 
 ## No copyrighted assets are included in this repository
@@ -55,6 +61,28 @@ supported dumps (internal name `SMASH BROTHERS`):
 | **JP** — Nintendo All-Star! Dairantou Smash Brothers v1.0 | `NALJ` | `4b71f0e01878696733eefa9c80d11c147ecb4984` | `66db457b130d31a286a23d6e4dd9726e` |
 
 If your dump does not match the hashes for its version, it will not work.
+
+## Project stats
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme-stats/star-growth-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/readme-stats/star-growth-light.svg">
+    <img src="assets/readme-stats/star-growth-light.svg" alt="GitHub star growth chart" width="840">
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/readme-stats/release-downloads-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/readme-stats/release-downloads-light.svg">
+    <img src="assets/readme-stats/release-downloads-light.svg" alt="Downloads by Platform chart" width="840">
+  </picture>
+</p>
+
+<p align="center">
+  <sub>Charts are generated by GitHub Actions. Downloads are split by platform and ROM region; GitHub exposes current per-asset totals, not per-download timestamps.</sub>
+</p>
 
 ## Features
 

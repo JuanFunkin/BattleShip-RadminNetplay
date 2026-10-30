@@ -11,6 +11,7 @@ void portMusicSetVolume(int player, unsigned int vol); /* 0..30720, same scale a
 int portMusicTrackCount(void);            /* Audio Editor menu: number of music files found in mods/ */
 const char* portMusicTrackName(int i);   /* display name of track i */
 void portMusicRescan(void);
+unsigned int portMusicGameRemap(int player, unsigned int bgm); /* in-game song to play instead of bgm (Audio Editor swap) */
 /* Adds the active override streams on top of one synthesized frame (interleaved stereo s16). */
 void portMusicMix(short *pcm, int sampleCount);
 #ifdef __cplusplus

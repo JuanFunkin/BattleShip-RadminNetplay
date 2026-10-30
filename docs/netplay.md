@@ -112,3 +112,14 @@ Replace any BGM with an MP3/OGG/WAV: put `music/<bgmId>.mp3` (or `.ogg`/`.wav`) 
 ## Web asset editor
 
 `web/index.html` is a static page (English default, Español option). GitHub Pages deploys it through `.github/workflows/pages.yml`. When you change the editor, copy the new build over `web/index.html` and push.
+
+## Menu reorganisation, stage and room cheats (update 14)
+
+- Top bar: Settings, Enhancements, Controls, Network, Dev Tools, About. Network has *LAN Online* (host/join/lobby), *Match Options* (mode, stage, players, rules, room cheats, input delay) and *How to Play*.
+- Host-chosen stage (`gNetplay.Stage`: -1 stage select, -2 random, 0-8 stage id) is applied in `syNetLobbyBeginHostMatch` before the metadata is captured, so every peer receives it.
+- Room cheats (`gNetplay.RoomCheats`, bit0 jumps, 1 shield, 2 0%, 3 stocks, 4 CPU 999%) travel in the `T_CONFIG` packet (new `cheats` byte). While a room is open the local cheat CVars are ignored and the match mask is used on every peer; it resets when the match ends or the room closes.
+- Audio Editor: `gMusicOverride.Sel.<id>` also accepts `game:<id>` (play another song of the game) and `any` (random among the game's songs and custom files).
+
+## New-release notice (update 15)
+
+On startup the port asks `https://api.github.com/repos/JuanFunkin/BattleShipDX/releases/latest` (curl, background thread, once per session). If the tag is newer than `BATTLESHIPDX_VERSION` (`port/enhancements/Updater.cpp`, default `v1.0.0`), the menu shows a clickable message at the top right that opens `https://github.com/JuanFunkin/BattleShipDX/releases`. Drafts and pre-releases are ignored by GitHub's `latest` endpoint. Not built on Android/UWP.
