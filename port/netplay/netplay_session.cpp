@@ -45,7 +45,7 @@ constexpr uint8_t kVersion = 2;
 
 enum Type : uint8_t {
     T_HELLO = 1, T_WELCOME, T_REJECT, T_ROSTER, T_CHOICE, T_LEAVE,
-    T_CONFIG, T_CONFIG_ACK, T_READY, T_START, T_INPUT, T_ABORT
+    T_CONFIG, T_CONFIG_ACK, T_READY, T_START, T_INPUT, T_ABORT, T_SYNC
 };
 
 constexpr int kMaxFramesPerBlock = 32;
@@ -137,6 +137,9 @@ struct Session::Impl {
     bool aborted = false;
     std::string abortReason;
     uint32_t rng = 12345;
+    struct SyncCell { uint32_t tick = 0, hash = 0; bool valid = false; };
+    SyncCell hostSync[64];
+    SyncCell peerSync[kMaxSlots][64];
     int abortSends = 0;
     uint64_t lastAbortSend = 0;
 };
@@ -440,6 +443,14 @@ void Session::Poll() {
                     d->abortSends = 10; d->lastAbortSend = 0;
                     EndMatch();
                 }
+            } else if (type == T_SYNC && mMatchActive) {
+                uint32_t id = r.u32(), tk = r.u32(), hs = r.u32();
+                if (!r.bad && id == d->matchId) {
+                    Impl::SyncCell& pc = d->peerSync[slot][tk & 63];
+                    pc.tick = tk; pc.hash = hs; pc.valid = true;
+                    const Impl::SyncCell& hc = d->hostSync[tk & 63];
+                    if (hc.valid && hc.tick == tk && hc.hash != hs) ReportDesync(tk);
+                }
             } else if (type == T_CONFIG_ACK) {
                 if ((uint32_t)r.u32() == d->matchId) p.configAcked = true;
             } else if (type == T_READY) {
@@ -626,6 +637,32 @@ void Session::Poll() {
         d->abortSends--; d->lastAbortSend = now;
         Writer w; header(w, T_ABORT, 0);
         for (int s = 1; s < kMaxSlots; s++) if (d->peers[s].used) sendRaw(this, d->sock, d->peers[s].addr, w, packetsSent);
+    }
+}
+
+void Session::ReportDesync(uint32_t tick) {
+    if (d->aborted || !mMatchActive) return;
+    char b[96];
+    snprintf(b, sizeof(b), "Desync detected at tick %u. Both players need the same build and the same enhancement settings.", tick);
+    d->aborted = true; d->abortReason = b;
+    d->abortSends = 10; d->lastAbortSend = 0;
+    EndMatch();
+}
+
+void Session::SubmitSync(uint32_t tick, uint32_t hash) {
+    if (!mMatchActive) return;
+    if (mState == State::Hosting) {
+        Impl::SyncCell& hc = d->hostSync[tick & 63];
+        hc.tick = tick; hc.hash = hash; hc.valid = true;
+        for (int s = 1; s < kMaxSlots; s++) {
+            if (!d->peers[s].used || !(mMatchMask & (1 << s))) continue;
+            const Impl::SyncCell& pc = d->peerSync[s][tick & 63];
+            if (pc.valid && pc.tick == tick && pc.hash != hash) { ReportDesync(tick); return; }
+        }
+    } else if (mState == State::Connected) {
+        Writer w; header(w, T_SYNC, mSlot); w.u32(d->matchId); w.u32(tick); w.u32(hash);
+        sendRaw(this, d->sock, d->hostAddr, w, packetsSent);
+        sendRaw(this, d->sock, d->hostAddr, w, packetsSent); // twice: UDP may drop one
     }
 }
 

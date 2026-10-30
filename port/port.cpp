@@ -470,8 +470,25 @@ void MountModsDir() {
 	const fs::path modsDir(ssb64::RealAppBundlePath() + "/mods");
 #endif
 	std::error_code ec;
+	{
+		/* Hi-res texture packs are read from <app-data>/mods (next to BattleShip.o2r and the
+		 * save file), which is not always the exe folder: create that one as well. */
+		const fs::path appMods(Ship::Context::GetPathRelativeToAppDirectory("mods"));
+		std::error_code appEc;
+		if (!fs::exists(appMods, appEc)) {
+			fs::create_directories(appMods, appEc);
+			if (!appEc) {
+				port_log("SSB64: created mods folder -> %s\n", appMods.generic_string().c_str());
+			}
+		}
+	}
 	if (!fs::exists(modsDir, ec)) {
-		return;
+		/* First run: create the folder so players know where mods go. */
+		fs::create_directories(modsDir, ec);
+		if (ec || !fs::exists(modsDir, ec)) {
+			return;
+		}
+		port_log("SSB64: created mods folder -> %s\n", modsDir.generic_string().c_str());
 	}
 
 	/* Build a set of already-mounted archive paths so we don't

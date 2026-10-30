@@ -51,6 +51,8 @@ int np_match_delay(void);
 void np_ready(void);
 int np_start_released(void);
 void np_end_match(void);
+uint32_t np_settings_hash(void); /* fingerprint of the port settings that change the simulation (must match on every peer) */
+void np_submit_sync(uint32_t tick, uint32_t hash); /* desync detection: both sides hash the game state every 30 ticks */
 int np_consume_abort(void);                  /* 1 once after an abort */
 const char *np_abort_reason(void);
 
