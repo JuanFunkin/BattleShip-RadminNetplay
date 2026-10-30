@@ -108,3 +108,7 @@ Replace any BGM with an MP3/OGG/WAV: put `music/<bgmId>.mp3` (or `.ogg`/`.wav`) 
 
 - **Menu > Assets > Audio Editor**: pick the music file for every BGM id (Default / Original / Random custom / any file in `mods/music`, `.zip` or `.o2r`). Stored in CVars `gMusicOverride.Sel.<id>`. Hi-res texture packs can now also be `.o2r`.
 - **Menu > Settings > Cheats > Gameplay Cheats (offline only)**: infinite jumps, infinite shield, always 0%, infinite stocks/lives, CPU fighters at 999%. Applied in `ftMainProcUpdateInterrupt` / `ftCommonDeadProcUpdate` and forced off while an online room is open (`syNetLobbyIsRoomOpen`).
+
+## Web asset editor
+
+`web/index.html` is a static page (English default, Español option). GitHub Pages deploys it through `.github/workflows/pages.yml`. When you change the editor, copy the new build over `web/index.html` and push.
