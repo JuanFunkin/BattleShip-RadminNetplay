@@ -1,3 +1,1 @@
-/* stb_vorbis (public domain, nothings/stb) — OGG decoding for music overrides. */
-#define STB_VORBIS_NO_STDIO
-#include "stb_vorbis.inc"
+/* intentionally empty: stb_vorbis.c is the OGG decoder TU. Kept so stale copies of this file are harmless. */

@@ -14,6 +14,13 @@ extern "C" {
     int port_cheat_unlock_soundtest()  { return CVarGetInteger("gCheats.UnlockSoundTest", 0); }
     int port_cheat_unlock_itemswitch() { return CVarGetInteger("gCheats.UnlockItemSwitch", 0); }
 
+    // Any unlock cheat on? (folded into the netplay settings hash)
+    int port_cheat_unlock_all_active() {
+        return port_cheat_unlock_all() | port_cheat_unlock_luigi() | port_cheat_unlock_ness() |
+               port_cheat_unlock_captain() | port_cheat_unlock_purin() | port_cheat_unlock_inishie() |
+               port_cheat_unlock_soundtest() | port_cheat_unlock_itemswitch();
+    }
+
     // Gameplay cheats are local-only: they would desync an online match, so they
     // switch themselves off while an online room is open.
     int port_cheat_gameplay_enabled()  { return CVarGetInteger("gCheats.Gameplay", 0) && !syNetLobbyIsRoomOpen(); }
