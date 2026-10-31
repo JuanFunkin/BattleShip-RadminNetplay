@@ -1,0 +1,48 @@
+# BattleShipDX on Android
+
+The upstream port already ships an Android build (see `android_port_status_2026-05-01.md` and
+`android_armeabi_v7a_2026-06-20.md`). BattleShipDX builds it with its own additions.
+
+## Building the APKs
+
+Actions tab → **Android (APK)** → *Run workflow* (or push a `v*` tag). It builds two APKs and uploads them as artifacts:
+
+- `BattleShipDX-android-arm64-v8a.apk` — 64-bit ARM (almost every phone from the last ~8 years).
+- `BattleShipDX-android-armeabi-v7a.apk` — 32-bit ARM (older / cheap phones, TV boxes).
+
+Without signing secrets the APK is debug-signed (fine for sideloading). To get a stable certificate add the
+`SSB64_ANDROID_KEYSTORE_BASE64`, `SSB64_ANDROID_KEYSTORE_PASSWORD`, `SSB64_ANDROID_KEY_ALIAS` and
+`SSB64_ANDROID_KEY_PASSWORD` repository secrets. `release.yml` also builds both ABIs for releases.
+
+## First run
+
+1. Install the APK (allow "install unknown apps").
+2. Pick your own `baserom.us.z64` when asked; the game builds `BattleShip.o2r` on the device.
+3. Open the menu with the hamburger button on the touch overlay.
+
+## Online with PCs and other phones
+
+Phones can't use Radmin, but any VPN that gives every device an IP works:
+
+- **Tailscale**: install it on every device, sign in to the same tailnet, and use the host's `100.x.y.z` address.
+- **ZeroTier**: join the same network ID on every device and use the host's ZeroTier IP.
+
+Then it is the usual flow: the host opens *Network → LAN Online → Host game*; the others type the host IP and the
+same UDP port and press *Join game*. The soft keyboard opens when you tap a text field. The app has the `INTERNET`
+permission for this.
+
+## Mods on Android
+
+- Hi-res texture packs and music packs: the in-app importer copies a `.zip` into the app's `mods` folder.
+  A pack exported as `.o2r` is a zip file: rename it to `.zip` before importing.
+- Cheats, the Audio Editor and the Network menu work like on PC. The new-release notice and the script mods are
+  desktop only.
+
+## Known limits (not verified on a device)
+
+- The BattleShipDX additions were written on top of the upstream Android port and have **not been run on a phone**.
+  Expect to fix small things after the first build.
+- Cross-play between PC and Android relies on the simulation being identical on both. The game code is built with
+  `-ffp-contract=off` to avoid ARM/x86 float differences, but this has not been tested. If a match reports a desync,
+  please report which devices were involved. 32-bit ARM is the most likely to differ.
+- 32-bit phones have little RAM: keep hi-res packs small.

@@ -1929,7 +1929,7 @@ void RenderLanOnline(WidgetInfo&) {
     const int state = np_state();
     const bool idle = (state == NP_IDLE || state == NP_FAILED);
 
-    ImGui::TextWrapped("Play with friends over a LAN or a VPN (Radmin / Hamachi). Everybody must run the exact same "
+    ImGui::TextWrapped("Play with friends over a LAN or a VPN (Radmin, Hamachi, ZeroTier or Tailscale; phones and PCs can play together). Everybody must run the exact same "
                        "build with the same settings. The host shares its IP and the UDP port opened in the firewall.");
 
     if (idle) {
@@ -2104,7 +2104,7 @@ void RenderMatchOptions(WidgetInfo&) {
 void RenderNetHelp(WidgetInfo&) {
     NpHeader("How it works");
     ImGui::BulletText("The host is Player 1. Up to 3 friends can join as Player 2, 3 and 4.");
-    ImGui::BulletText("HOST: open \"LAN Online\", press \"Host game\" and share your IP (Radmin / LAN) and the port.");
+    ImGui::BulletText("HOST: open \"LAN Online\", press \"Host game\" and share your IP (Radmin / ZeroTier / Tailscale / LAN) and the port.");
     ImGui::BulletText("JOINERS: type the host's IP and the same port, choose your fighter and press \"Join game\".");
     ImGui::BulletText("HOST: choose the rules (and the stage in \"Match Options\" if you want), then press START.");
     ImGui::BulletText("Each player uses their own controller on port 1 of their own PC.");
@@ -2502,6 +2502,18 @@ void PortMenu::DrawElement() {
     if (mMenuElementsInitialized) {
         Ship::Menu::DrawElement();
     }
+
+#if defined(__ANDROID__)
+    // Show the soft keyboard while a text field (name / host IP) is being edited.
+    {
+        static bool sImeOn = false;
+        const bool want = ImGui::GetIO().WantTextInput;
+        if (want != sImeOn) {
+            sImeOn = want;
+            if (want) SDL_StartTextInput(); else SDL_StopTextInput();
+        }
+    }
+#endif
 
 #if !defined(__ANDROID__) && !defined(BATTLESHIP_UWP)
     // "New update released" notice, top right. Click opens the GitHub releases page.
