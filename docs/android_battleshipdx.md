@@ -20,6 +20,17 @@ Without signing secrets the APK is debug-signed (fine for sideloading). To get a
 2. Pick your own `baserom.us.z64` when asked; the game builds `BattleShip.o2r` on the device.
 3. Open the menu with the hamburger button on the touch overlay.
 
+## Touch controls (configurable)
+
+Tap the **gear** next to the menu button to edit the controls:
+
+- **Drag** any control to move it; **tap** it to change its size or hide it.
+- Global **opacity** and **size**, vibration on touch.
+- **Stick:** floating (the base appears where you touch, on the left side) or fixed; the base can follow your finger;
+  adjustable dead zone and sensitivity.
+- New **Jump** button (mapped to C-up, the N64 jump button).
+- *Reset layout* restores the defaults. The layout is saved on the device.
+
 ## Online with PCs and other phones
 
 Phones can't use Radmin, but any VPN that gives every device an IP works:

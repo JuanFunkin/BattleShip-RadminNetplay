@@ -38,7 +38,7 @@ Keep this list up to date: every new feature gets a line here.
 ### Menu
 
 - Reorganised top bar: **Settings, Enhancements, Controls, Network, Dev Tools, About**. Mods live in Settings, Audio Editor and Cheats in Enhancements, input mapping in Controls, extraction/paths/diagnostics/netplay debug in Dev Tools, and a BattleShipDX About page with the original credits.
-- **Android** (arm64-v8a and armeabi-v7a APKs from the *Android (APK)* workflow) with online play over Tailscale or ZeroTier. See [`docs/android_battleshipdx.md`](docs/android_battleshipdx.md). Experimental: not tested on a device yet.
+- **Android** (arm64-v8a and armeabi-v7a APKs from the *Android (APK)* workflow) with online play over Tailscale or ZeroTier. See [`docs/android_battleshipdx.md`](docs/android_battleshipdx.md). Configurable touch controls (position, size, opacity, floating stick, jump button). Experimental.
 - **New-release notice**: when a newer release is published on GitHub, the menu shows a clickable message at the top right that opens the releases page. (When you publish a release, set `BATTLESHIPDX_VERSION` in `port/enhancements/Updater.cpp` to the same tag.)
 - **Network → LAN Online / Match Options / How to Play**, laid out like the Ship of Harkinian menus.
 

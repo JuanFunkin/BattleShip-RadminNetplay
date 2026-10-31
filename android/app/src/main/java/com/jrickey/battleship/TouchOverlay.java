@@ -109,6 +109,42 @@ public final class TouchOverlay {
         sMenuPoller = null;
     }
 
+    // BattleShipDX: user-configurable layout (position / size / opacity), see TouchLayoutConfig.
+    private static final int SDL_CONTROLLER_AXIS_RIGHTX = 2;
+    private static final int SDL_CONTROLLER_AXIS_RIGHTY = 3;
+
+    private static TouchLayoutConfig sCfg;
+    private static OverlayRoot sGameplay;
+    private static AnalogStickView sStick;
+    private static final java.util.Map<String, ControlButtonView> sButtons = new java.util.LinkedHashMap<>();
+    private static ControlButtonView sGear;
+    private static View sEditPanel;
+    private static boolean sEditing = false;
+    private static String sSelected = null;
+    private static EditPanelUi sPanelUi;
+
+    /** Positions every control from the saved layout (centre fractions of the screen). */
+    static final class OverlayRoot extends FrameLayout {
+        OverlayRoot(Context c) { super(c); setClipChildren(false); }
+        @Override
+        protected void onLayout(boolean changed, int l, int t, int r, int b) {
+            int w = r - l, h = b - t;
+            for (int i = 0; i < getChildCount(); i++) {
+                View v = getChildAt(i);
+                if (v instanceof ControlButtonView && ((ControlButtonView) v).item != null) {
+                    ControlButtonView cb = (ControlButtonView) v;
+                    int d = cb.diameterPx();
+                    int cx = Math.round(cb.item.x * w), cy = Math.round(cb.item.y * h);
+                    v.measure(MeasureSpec.makeMeasureSpec(d, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(d, MeasureSpec.EXACTLY));
+                    v.layout(cx - d / 2, cy - d / 2, cx - d / 2 + d, cy - d / 2 + d);
+                } else {
+                    v.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+                    v.layout(0, 0, w, h);
+                }
+            }
+        }
+    }
+
     /**
      * Build the overlay and addContentView() it onto the Activity. Must
      * be called AFTER super.onCreate so SDLActivity has already installed
@@ -116,100 +152,295 @@ public final class TouchOverlay {
      */
     public static void install(Activity activity) {
         FrameLayout root = new FrameLayout(activity);
+        sCfg = new TouchLayoutConfig();
+        sCfg.load(activity);
+        sButtons.clear();
 
-        // Two sibling layers under `root`, so we can show/hide them
-        // independently:
-        //
-        //   * gameplayLayer — analog stick + face cluster + shoulders + Start.
-        //     Hidden when (a) a physical gamepad is paired (the user is
-        //     playing with the real pad and the overlay would just steal
-        //     touches), or (b) the LUS menu is open (touches need to fall
-        //     through to ImGui for menu navigation).
-        //
-        //   * menuButton — just the hamburger. Auto-hides on the same two
-        //     conditions as gameplayLayer: a physical gamepad is in control
-        //     (its Select button opens the LUS menu, so the touch shortcut
-        //     is redundant), or the menu is already open (taps need to fall
-        //     through to ImGui).
-        //
-        // Both layers now share identical visibility rules — see
-        // refreshOverlayVisibility(). They're kept as separate views only
-        // because they group logically distinct controls (gameplay vs. menu).
-        FrameLayout gameplayLayer = new FrameLayout(activity);
-        FrameLayout menuLayer     = new FrameLayout(activity);
+        // gameplayLayer: stick + game buttons (hidden when a gamepad is paired or the LUS menu is open).
+        // menuLayer: the hamburger and the settings (gear) button, same visibility rules.
+        OverlayRoot gameplayLayer = new OverlayRoot(activity);
+        FrameLayout menuLayer = new FrameLayout(activity);
+        sGameplay = gameplayLayer;
 
-        // Left half of gameplayLayer: analog stick capture region.
-        AnalogStickView stick = new AnalogStickView(activity);
-        stick.setLayoutParams(new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT));
-        FrameLayout stickHost = new FrameLayout(activity);
-        stickHost.addView(stick);
-        gameplayLayer.addView(stickHost, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            Gravity.START | Gravity.FILL_VERTICAL));
-        // Pin the stick capture region to the left half of the screen, and
-        // re-derive it on every layout. BattleShipActivity survives
-        // screenSize/smallestScreenSize config changes (see manifest
-        // android:configChanges), so a one-shot width goes stale on a live
-        // resize (multi-window, foldable, free-form), leaving the fixed anchor
-        // centered in a dead or oversized region. Listening on the parent's
-        // layout keeps the half-width correct across resizes; the width guard
-        // ignores pre-layout 0-width passes and prevents a re-layout loop.
-        gameplayLayer.addOnLayoutChangeListener(
-            (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-                int half = (right - left) / 2;
-                ViewGroup.LayoutParams lp = stickHost.getLayoutParams();
-                if (half > 0 && lp.width != half) {
-                    lp.width = half;
-                    stickHost.setLayoutParams(lp);
-                }
-            });
+        sStick = new AnalogStickView(activity, sCfg);
+        gameplayLayer.addView(sStick);
 
-        // ── Face cluster (right thumb) ──────────────────────────────────
-        addBtnButton(activity, gameplayLayer, "A",     SDL_CONTROLLER_BUTTON_A,
-                     R.drawable.btn_n64_a, 120,
-                     Gravity.BOTTOM | Gravity.END,    24,  60);
-        addBtnButton(activity, gameplayLayer, "B",     SDL_CONTROLLER_BUTTON_B,
-                     R.drawable.btn_n64_b, 110,
-                     Gravity.BOTTOM | Gravity.END,   150,  90);
+        addGameButton(activity, gameplayLayer, "A",     "A",     0xFF3B82F6, 84, down -> setButton(SDL_CONTROLLER_BUTTON_A, down));
+        addGameButton(activity, gameplayLayer, "B",     "B",     0xFF22C55E, 72, down -> setButton(SDL_CONTROLLER_BUTTON_B, down));
+        addGameButton(activity, gameplayLayer, "Jump",  "Jump",  0xFFEAB308, 62, down -> setAxis(SDL_CONTROLLER_AXIS_RIGHTY, down ? -32767 : 0)); // C-up = jump
+        addGameButton(activity, gameplayLayer, "Z",     "Z",     0xFF9CA3AF, 62, down -> setTrigger(SDL_CONTROLLER_AXIS_TRIGGERLEFT, down));
+        addGameButton(activity, gameplayLayer, "R",     "R",     0xFF9CA3AF, 62, down -> setTrigger(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, down));
+        addGameButton(activity, gameplayLayer, "Start", "Start", 0xFFEF4444, 54, down -> setButton(SDL_CONTROLLER_BUTTON_START, down));
 
-        // Start at bottom-center — well away from A to avoid mistaps.
-        addBtnButton(activity, gameplayLayer, "Start", SDL_CONTROLLER_BUTTON_START,
-                     R.drawable.btn_n64_start, 70,
-                     Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 24);
-
-        // ── Shoulder/trigger row (top-right corner) ─────────────────────
-        // Z and R map to trigger axes; see setTrigger() helper for the
-        // raw-value convention.
-        addAxisButton(activity, gameplayLayer, "Z",
-                      SDL_CONTROLLER_AXIS_TRIGGERLEFT,
-                      R.drawable.btn_n64_z, 90,
-                      Gravity.TOP | Gravity.END,   130, 24);
-        addAxisButton(activity, gameplayLayer, "R",
-                      SDL_CONTROLLER_AXIS_TRIGGERRIGHT,
-                      R.drawable.btn_n64_r, 90,
-                      Gravity.TOP | Gravity.END,    24, 24);
-
-        // ── Menu (top-left corner) — lives in its own layer. ────────────
-        addMenuButton(activity, menuLayer, R.drawable.btn_n64_menu, 70,
-                      Gravity.TOP | Gravity.START, 24, 24);
+        // Menu hamburger (top-left) and settings gear next to it. Fixed size, not editable.
+        ControlButtonView menuBtn = new ControlButtonView(activity, sCfg, null, "\u2261", 0xFF6B7280, 46);
+        FrameLayout.LayoutParams mlp = new FrameLayout.LayoutParams(dp(activity, 46), dp(activity, 46), Gravity.TOP | Gravity.START);
+        mlp.leftMargin = dp(activity, 16); mlp.topMargin = dp(activity, 12);
+        menuBtn.pressListener = down -> { if (!down && !sEditing) toggleMenu(); };
+        menuLayer.addView(menuBtn, mlp);
+        sGear = new ControlButtonView(activity, sCfg, null, "\u2699", 0xFF6B7280, 46);
+        FrameLayout.LayoutParams glp = new FrameLayout.LayoutParams(dp(activity, 46), dp(activity, 46), Gravity.TOP | Gravity.START);
+        glp.leftMargin = dp(activity, 16 + 46 + 10); glp.topMargin = dp(activity, 12);
+        sGear.pressListener = down -> { if (!down) setEditMode(activity, true); };
+        menuLayer.addView(sGear, glp);
 
         root.addView(gameplayLayer, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT));
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(menuLayer, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT));
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        sPanelUi = new EditPanelUi(activity);
+        sEditPanel = sPanelUi.build();
+        sEditPanel.setVisibility(View.GONE);
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(dp(activity, 330), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        root.addView(sEditPanel, plp);
 
         activity.addContentView(root,
             new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
+        applyEditState();
         installControllerWatcher(activity, gameplayLayer, menuLayer);
         installMenuVisibilityPoller(activity, gameplayLayer, menuLayer);
+    }
+
+    private interface Press { void on(boolean down); }
+
+    private static void addGameButton(Context ctx, OverlayRoot layer, String id, String label, int color, int baseDp, Press p) {
+        ControlButtonView v = new ControlButtonView(ctx, sCfg, sCfg.items.get(id), label, color, baseDp);
+        v.pressListener = p::on;
+        v.editListener = new ControlButtonView.EditListener() {
+            @Override public void onSelect(ControlButtonView b) { selectControl(b.item.id); }
+            @Override public void onMoved(ControlButtonView b) { }
+            @Override public void onDrop(ControlButtonView b) { sCfg.save(); }
+        };
+        layer.addView(v);
+        sButtons.put(id, v);
+    }
+
+    // ── edit mode ───────────────────────────────────────────────────────
+    private static void releaseAllInputs() {
+        setButton(SDL_CONTROLLER_BUTTON_A, false);
+        setButton(SDL_CONTROLLER_BUTTON_B, false);
+        setButton(SDL_CONTROLLER_BUTTON_START, false);
+        setTrigger(SDL_CONTROLLER_AXIS_TRIGGERLEFT, false);
+        setTrigger(SDL_CONTROLLER_AXIS_TRIGGERRIGHT, false);
+        setAxis(SDL_CONTROLLER_AXIS_RIGHTX, 0);
+        setAxis(SDL_CONTROLLER_AXIS_RIGHTY, 0);
+        if (sStick != null) sStick.resetInput();
+    }
+
+    private static void setEditMode(Context ctx, boolean on) {
+        try { releaseAllInputs(); } catch (UnsatisfiedLinkError ignored) { }
+        sEditing = on;
+        if (!on) { sSelected = null; sCfg.save(); }
+        applyEditState();
+    }
+
+    private static void applyEditState() {
+        if (sCfg == null) return;
+        for (ControlButtonView v : sButtons.values()) {
+            v.editMode = sEditing;
+            v.selected = sEditing && v.item.id.equals(sSelected);
+            v.setVisibility(sEditing || v.item.visible ? View.VISIBLE : View.GONE);
+            v.invalidate();
+        }
+        if (sStick != null) {
+            sStick.editMode = sEditing;
+            sStick.selected = sEditing && TouchLayoutConfig.STICK.equals(sSelected);
+            sStick.editListener = new AnalogStickView.EditListener() {
+                @Override public void onSelect() { selectControl(TouchLayoutConfig.STICK); }
+                @Override public void onMoved() { }
+                @Override public void onDrop() { sCfg.save(); }
+            };
+            sStick.invalidate();
+        }
+        if (sEditPanel != null) sEditPanel.setVisibility(sEditing ? View.VISIBLE : View.GONE);
+        if (sGear != null) sGear.setVisibility(sEditing ? View.INVISIBLE : View.VISIBLE);
+        if (sPanelUi != null) sPanelUi.refresh();
+        if (sGameplay != null) sGameplay.requestLayout();
+    }
+
+    private static void selectControl(String id) {
+        sSelected = id;
+        applyEditState();
+    }
+
+    /** Re-layout and redraw after a setting changed. */
+    private static void relayoutAll() {
+        if (sGameplay != null) sGameplay.requestLayout();
+        for (ControlButtonView v : sButtons.values()) v.invalidate();
+        if (sStick != null) sStick.invalidate();
+    }
+
+    /** The edit panel: sliders and switches built from plain Android views. */
+    private static final class EditPanelUi {
+        private final Context ctx;
+        private TextView selTitle;
+        private android.widget.SeekBar selSize;
+        private android.widget.CheckBox selVisible;
+        private android.widget.LinearLayout body;
+        private boolean updating = false;
+
+        EditPanelUi(Context c) { ctx = c; }
+
+        private interface FloatCb { void set(float v); }
+
+        private android.widget.SeekBar slider(android.widget.LinearLayout parent, String title, float lo, float hi, float cur, String unit, FloatCb cb, TextView[] outLabel) {
+            TextView label = new TextView(ctx);
+            label.setTextColor(Color.WHITE);
+            label.setTextSize(13f);
+            label.setPadding(0, dp(ctx, 8), 0, 0);
+            parent.addView(label);
+            android.widget.SeekBar sb = new android.widget.SeekBar(ctx);
+            sb.setMax(1000);
+            sb.setProgress(Math.round((cur - lo) / (hi - lo) * 1000f));
+            label.setText(title + ": " + Math.round(cur * 100f) + unit);
+            sb.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(android.widget.SeekBar s, int p, boolean user) {
+                    float v = lo + (hi - lo) * p / 1000f;
+                    label.setText(title + ": " + Math.round(v * 100f) + unit);
+                    if (user && !updating) { cb.set(v); relayoutAll(); }
+                }
+                @Override public void onStartTrackingTouch(android.widget.SeekBar s) { }
+                @Override public void onStopTrackingTouch(android.widget.SeekBar s) { sCfg.save(); }
+            });
+            parent.addView(sb);
+            if (outLabel != null) outLabel[0] = label;
+            return sb;
+        }
+
+        private android.widget.CheckBox check(android.widget.LinearLayout parent, String text, boolean cur, android.widget.CompoundButton.OnCheckedChangeListener l) {
+            android.widget.CheckBox cb = new android.widget.CheckBox(ctx);
+            cb.setText(text);
+            cb.setTextColor(Color.WHITE);
+            cb.setTextSize(13f);
+            cb.setChecked(cur);
+            cb.setOnCheckedChangeListener(l);
+            parent.addView(cb);
+            return cb;
+        }
+
+        View build() {
+            android.widget.LinearLayout panel = new android.widget.LinearLayout(ctx);
+            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setColor(Color.argb(0xE8, 0x12, 0x14, 0x1C));
+            bg.setCornerRadius(dp(ctx, 14));
+            bg.setStroke(dp(ctx, 1), Color.argb(0x80, 255, 255, 255));
+            panel.setBackground(bg);
+            panel.setPadding(dp(ctx, 14), dp(ctx, 10), dp(ctx, 14), dp(ctx, 10));
+
+            TextView title = new TextView(ctx);
+            title.setText("Edit controls");
+            title.setTextColor(Color.WHITE);
+            title.setTextSize(17f);
+            title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            panel.addView(title);
+            TextView hint = new TextView(ctx);
+            hint.setText("Drag a control to move it. Tap it to change its size or hide it.");
+            hint.setTextColor(Color.argb(0xCC, 255, 255, 255));
+            hint.setTextSize(12f);
+            panel.addView(hint);
+
+            android.widget.ScrollView sv = new android.widget.ScrollView(ctx);
+            body = new android.widget.LinearLayout(ctx);
+            body.setOrientation(android.widget.LinearLayout.VERTICAL);
+            sv.addView(body);
+            int maxH = Math.round(ctx.getResources().getDisplayMetrics().heightPixels * 0.55f);
+            panel.addView(sv, new android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxH));
+
+            // Selected control
+            selTitle = new TextView(ctx);
+            selTitle.setTextColor(Color.rgb(255, 214, 10));
+            selTitle.setTextSize(14f);
+            selTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            selTitle.setPadding(0, dp(ctx, 8), 0, 0);
+            body.addView(selTitle);
+            selSize = slider(body, "Size of this control", 0.5f, 2.2f, 1f, "%", v -> {
+                TouchLayoutConfig.Item it = sCfg.items.get(sSelected);
+                if (it != null) it.scale = v;
+            }, null);
+            selVisible = check(body, "Show this control", true, (b, on) -> {
+                if (updating) return;
+                TouchLayoutConfig.Item it = sCfg.items.get(sSelected);
+                if (it != null) { it.visible = on; sCfg.save(); applyEditState(); }
+            });
+
+            // Global
+            TextView g = new TextView(ctx);
+            g.setText("All controls");
+            g.setTextColor(Color.rgb(120, 180, 255));
+            g.setTextSize(14f);
+            g.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            g.setPadding(0, dp(ctx, 12), 0, 0);
+            body.addView(g);
+            slider(body, "Opacity", 0.15f, 1f, sCfg.opacity, "%", v -> sCfg.opacity = v, null);
+            slider(body, "Size", 0.6f, 1.6f, sCfg.sizeScale, "%", v -> sCfg.sizeScale = v, null);
+            check(body, "Vibrate on touch", sCfg.haptics, (b, on) -> { sCfg.haptics = on; sCfg.save(); });
+
+            TextView s = new TextView(ctx);
+            s.setText("Stick");
+            s.setTextColor(Color.rgb(120, 180, 255));
+            s.setTextSize(14f);
+            s.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            s.setPadding(0, dp(ctx, 12), 0, 0);
+            body.addView(s);
+            check(body, "Floating stick (appears where you touch)", sCfg.floating, (b, on) -> { sCfg.floating = on; sCfg.save(); relayoutAll(); });
+            check(body, "Base follows your finger", sCfg.follow, (b, on) -> { sCfg.follow = on; sCfg.save(); });
+            slider(body, "Dead zone", 0f, 0.4f, sCfg.deadzone, "%", v -> sCfg.deadzone = v, null);
+            slider(body, "Sensitivity", 0.6f, 1.6f, sCfg.sensitivity, "%", v -> sCfg.sensitivity = v, null);
+
+            android.widget.LinearLayout row = new android.widget.LinearLayout(ctx);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setPadding(0, dp(ctx, 10), 0, 0);
+            android.widget.Button reset = new android.widget.Button(ctx);
+            reset.setText("Reset layout");
+            reset.setOnClickListener(v -> { sCfg.resetAll(); sSelected = null; setEditMode(ctx, false); sPanelUi.rebuild(); setEditMode(ctx, true); });
+            android.widget.Button done = new android.widget.Button(ctx);
+            done.setText("Done");
+            done.setOnClickListener(v -> setEditMode(ctx, false));
+            row.addView(reset, new android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            row.addView(done, new android.widget.LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            panel.addView(row);
+            panelRoot = panel;
+            return panel;
+        }
+
+        private android.widget.LinearLayout panelRoot;
+
+        /** Rebuild the controls so the sliders show the reset values. */
+        void rebuild() {
+            if (panelRoot == null) return;
+            ViewGroup parent = (ViewGroup) panelRoot.getParent();
+            if (parent == null) return;
+            int idx = parent.indexOfChild(panelRoot);
+            ViewGroup.LayoutParams lp = panelRoot.getLayoutParams();
+            parent.removeView(panelRoot);
+            View fresh = build();
+            fresh.setVisibility(View.GONE);
+            parent.addView(fresh, idx, lp);
+            sEditPanel = fresh;
+        }
+
+        void refresh() {
+            if (selTitle == null) return;
+            updating = true;
+            TouchLayoutConfig.Item it = sSelected == null ? null : sCfg.items.get(sSelected);
+            if (it == null) {
+                selTitle.setText("Selected: (tap a control)");
+                selSize.setEnabled(false);
+                selVisible.setEnabled(false);
+            } else {
+                selTitle.setText("Selected: " + it.label);
+                selSize.setEnabled(true);
+                selVisible.setEnabled(true);
+                selSize.setProgress(Math.round((it.scale - 0.5f) / (2.2f - 0.5f) * 1000f));
+                selVisible.setChecked(it.visible);
+            }
+            updating = false;
+        }
     }
 
     /**
@@ -332,168 +563,6 @@ public final class TouchOverlay {
             if (isGamepad && !isBuiltinVirtual) count++;
         }
         return count;
-    }
-
-    // ── Button factories ────────────────────────────────────────────────
-    //
-    // Three variants share the same layout + press-feedback path; only
-    // the touch handler differs (button / axis / menu-toggle).
-
-    /** Plain SDL button — DOWN sets, UP clears. */
-    private static void addBtnButton(Context ctx, FrameLayout root,
-                                     String label, int sdlButton,
-                                     int drawableRes, int diameterDp,
-                                     int gravity,
-                                     int marginEndDp, int marginVerticalDp) {
-        View v = buildButton(ctx, root, label, drawableRes, diameterDp,
-                             gravity, marginEndDp, marginVerticalDp);
-        v.setOnTouchListener((view, ev) -> {
-            switch (ev.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                case MotionEvent.ACTION_POINTER_DOWN:
-                    setButton(sdlButton, true);
-                    setPressedVisuals(view, true);
-                    return true;
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    setButton(sdlButton, false);
-                    setPressedVisuals(view, false);
-                    return true;
-                default:
-                    return false;
-            }
-        });
-    }
-
-    /** Trigger-axis button. Press/release routes through {@link #setTrigger}
-     *  so the half-range vs full-range axis convention lives in one place. */
-    private static void addAxisButton(Context ctx, FrameLayout root,
-                                      String label, int sdlAxis,
-                                      int drawableRes, int diameterDp,
-                                      int gravity,
-                                      int marginEndDp, int marginVerticalDp) {
-        View v = buildButton(ctx, root, label, drawableRes, diameterDp,
-                             gravity, marginEndDp, marginVerticalDp);
-        v.setOnTouchListener((view, ev) -> {
-            switch (ev.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                case MotionEvent.ACTION_POINTER_DOWN:
-                    setTrigger(sdlAxis, true);
-                    setPressedVisuals(view, true);
-                    return true;
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    setTrigger(sdlAxis, false);
-                    setPressedVisuals(view, false);
-                    return true;
-                default:
-                    return false;
-            }
-        });
-    }
-
-    /** Menu-toggle button — single press → push F1 to SDL. No label. */
-    private static void addMenuButton(Context ctx, FrameLayout root,
-                                      int drawableRes, int diameterDp,
-                                      int gravity,
-                                      int marginEndDp, int marginVerticalDp) {
-        View v = buildButton(ctx, root, /*label*/ null, drawableRes,
-                             diameterDp, gravity, marginEndDp, marginVerticalDp);
-        v.setOnTouchListener((view, ev) -> {
-            switch (ev.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                case MotionEvent.ACTION_POINTER_DOWN:
-                    setPressedVisuals(view, true);
-                    return true;
-                case MotionEvent.ACTION_UP:
-                    toggleMenu();
-                    setPressedVisuals(view, false);
-                    return true;
-                case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    setPressedVisuals(view, false);
-                    return true;
-                default:
-                    return false;
-            }
-        });
-    }
-
-    /**
-     * Build the visual: an ImageView with the N64-styled vector drawable
-     * as background, optionally overlaid by a TextView with the label.
-     * Returns the touch target (the outermost view).
-     *
-     * For sub-1-char labels we use a single ImageView (label-less / icon
-     * baked into the vector). For multi-char labels we wrap ImageView +
-     * TextView in a FrameLayout so the text floats centered above.
-     */
-    private static View buildButton(Context ctx, FrameLayout root,
-                                    String label, int drawableRes, int diameterDp,
-                                    int gravity,
-                                    int marginEndDp, int marginVerticalDp) {
-        int sizePx       = dp(ctx, diameterDp);
-        int marginEndPx  = dp(ctx, marginEndDp);
-        int marginVertPx = dp(ctx, marginVerticalDp);
-        Drawable bg = ctx.getResources().getDrawable(drawableRes, ctx.getTheme());
-
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(sizePx, sizePx, gravity);
-        if ((gravity & Gravity.BOTTOM) != 0) lp.bottomMargin = marginVertPx;
-        if ((gravity & Gravity.TOP)    != 0) lp.topMargin    = marginVertPx;
-        if ((gravity & Gravity.END)    != 0) lp.rightMargin  = marginEndPx;
-        if ((gravity & Gravity.START)  != 0) lp.leftMargin   = marginEndPx;
-
-        if (label == null) {
-            // Icon baked into the drawable, no text overlay.
-            ImageView iv = new ImageView(ctx);
-            iv.setImageDrawable(bg);
-            iv.setLayoutParams(lp);
-            root.addView(iv);
-            return iv;
-        }
-
-        // Stack the label on top of the drawable inside a FrameLayout
-        // so the text floats centered without resizing the background.
-        FrameLayout host = new FrameLayout(ctx);
-        host.setLayoutParams(lp);
-
-        ImageView iv = new ImageView(ctx);
-        iv.setImageDrawable(bg);
-        iv.setLayoutParams(new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT));
-        host.addView(iv);
-
-        TextView tv = new TextView(ctx);
-        tv.setText(label);
-        tv.setTextColor(Color.WHITE);
-        // Single chars get a bigger glyph; "Start" stays modest so it fits.
-        tv.setTextSize(label.length() <= 1 ? 32f : 16f);
-        // Subtle shadow keeps the label readable over any background hue.
-        tv.setShadowLayer(4f, 0f, 1.5f, Color.argb(0xC0, 0, 0, 0));
-        tv.setGravity(Gravity.CENTER);
-        FrameLayout.LayoutParams tvLp = new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            Gravity.CENTER);
-        tv.setLayoutParams(tvLp);
-        host.addView(tv);
-
-        root.addView(host);
-        return host;
-    }
-
-    /** Visual feedback on touch: 92% scale + 70% alpha while held. */
-    private static void setPressedVisuals(View v, boolean pressed) {
-        if (pressed) {
-            v.animate().scaleX(0.92f).scaleY(0.92f).alpha(0.7f)
-                       .setDuration(40).start();
-        } else {
-            v.animate().scaleX(1.0f).scaleY(1.0f).alpha(1.0f)
-                       .setDuration(80).start();
-        }
     }
 
     private static int dp(Context ctx, int dp) {
