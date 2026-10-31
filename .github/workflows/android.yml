@@ -1,0 +1,88 @@
+name: Android (APK)
+
+# Builds the BattleShipDX Android APKs (64-bit arm64-v8a and 32-bit armeabi-v7a).
+# Run it by hand from the Actions tab, or push a tag. The APKs are uploaded as workflow artifacts.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-android:
+    name: build-android (${{ matrix.abi }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            apk_name: BattleShipDX-android-arm64-v8a.apk
+          - abi: armeabi-v7a
+            apk_name: BattleShipDX-android-armeabi-v7a.apk
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Pillow for CSS asset baking
+        run: sudo apt-get update && sudo apt-get install -y python3-pil
+      - name: Install Android SDK + NDK r29
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0 ndk;29.0.14206865'
+      - name: Generate f3d.o2r (Fast3D shaders bundled in the APK)
+        working-directory: libultraship/src/fast
+        run: cmake -E tar cf "$GITHUB_WORKSPACE/f3d.o2r" --format=zip shaders
+      - name: Decode release keystore (if configured via secrets)
+        env:
+          SSB64_ANDROID_KEYSTORE_BASE64:       ${{ secrets.SSB64_ANDROID_KEYSTORE_BASE64 }}
+          SSB64_ANDROID_KEYSTORE_PASSWORD:     ${{ secrets.SSB64_ANDROID_KEYSTORE_PASSWORD }}
+          SSB64_ANDROID_KEY_ALIAS:             ${{ secrets.SSB64_ANDROID_KEY_ALIAS }}
+          SSB64_ANDROID_KEY_PASSWORD:          ${{ secrets.SSB64_ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$SSB64_ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::warning::No release keystore secret configured; falling back to debug signing"
+            exit 0
+          fi
+          echo "$SSB64_ANDROID_KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.jks"
+          {
+            echo "SSB64_RELEASE_KEYSTORE=$GITHUB_WORKSPACE/release.jks"
+            echo "SSB64_RELEASE_KEYSTORE_PASSWORD=$SSB64_ANDROID_KEYSTORE_PASSWORD"
+            echo "SSB64_RELEASE_KEY_ALIAS=$SSB64_ANDROID_KEY_ALIAS"
+            echo "SSB64_RELEASE_KEY_PASSWORD=$SSB64_ANDROID_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease -Pssb64.abis=${{ matrix.abi }}
+      - name: Stage APK under a stable name
+        run: |
+          mkdir -p dist
+          shopt -s nullglob
+          apk=(android/app/build/outputs/apk/release/app-release*.apk)
+          if (( ${#apk[@]} == 0 )); then
+            echo "::error::no APK produced"
+            ls -la android/app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          cp "${apk[0]}" "dist/${{ matrix.apk_name }}"
+          ls -la dist/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.apk_name }}
+          path: dist/${{ matrix.apk_name }}
+          if-no-files-found: error

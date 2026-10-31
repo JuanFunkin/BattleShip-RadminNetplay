@@ -14,7 +14,7 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
 
@@ -111,7 +111,7 @@ jobs:
           Copy-Item -Recurse yamls/us dist/asset-tool/yamls/us
 
       - name: Upload UWP package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BattleShip-UWP-US-x64
           if-no-files-found: error
@@ -123,7 +123,7 @@ jobs:
             build-uwp/AppPackages/**/*.cer
 
       - name: Upload US asset tool
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: BattleShip-US-asset-tool
           if-no-files-found: error

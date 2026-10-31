@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Build and run loopback test
         run: |
           g++ -std=c++17 -O1 -Iport/netplay tools/netplay_test.cpp port/netplay/netplay_session.cpp -o netplay_test
@@ -40,7 +40,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
@@ -67,7 +67,7 @@ jobs:
           SSB64_ENABLE_SCRIPTING: "1"
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1
         shell: pwsh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: BattleShip-netplay-windows
           path: dist/BattleShip-windows.zip

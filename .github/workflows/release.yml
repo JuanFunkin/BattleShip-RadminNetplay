@@ -47,19 +47,29 @@ jobs:
       matrix:
         version: [us, jp]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           # fetch-depth: 0 grabs full history + all tags in one operation.
           # The built-in updater derives the version from `git describe
           # --tags` at configure time; checkout@v4's default shallow clone
           # omits tags. This used to be `fetch-tags: true`, but recent
-          # actions/checkout@v4 minor versions regressed on tag-triggered
+          # actions/checkout@v6 minor versions regressed on tag-triggered
           # workflows — the action tries to fetch BOTH the triggering
           # commit SHA AND refs/tags/<tag> and refuses with "Cannot fetch
           # both <sha> and refs/tags/<tag> to refs/tags/<tag>". Using
           # fetch-depth: 0 sidesteps the conflict.
           fetch-depth: 0
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
       - name: Install build deps
         # libultraship's CMake calls find_package on:
         #   libzip, nlohmann_json, tinyxml2, spdlog (libultraship/src)
@@ -162,7 +172,7 @@ jobs:
           MACOS_NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
           MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
         run: bash scripts/package-macos.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         # The .dmg is the standard drag-to-Applications installer macOS
         # users expect. We don't ship the loose .app zip anymore — anyone
         # wanting the bundle alone can pop the .dmg open and drag the
@@ -200,19 +210,29 @@ jobs:
       matrix:
         version: [us, jp]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           # fetch-depth: 0 grabs full history + all tags in one operation.
           # The built-in updater derives the version from `git describe
           # --tags` at configure time; checkout@v4's default shallow clone
           # omits tags. This used to be `fetch-tags: true`, but recent
-          # actions/checkout@v4 minor versions regressed on tag-triggered
+          # actions/checkout@v6 minor versions regressed on tag-triggered
           # workflows — the action tries to fetch BOTH the triggering
           # commit SHA AND refs/tags/<tag> and refuses with "Cannot fetch
           # both <sha> and refs/tags/<tag> to refs/tags/<tag>". Using
           # fetch-depth: 0 sidesteps the conflict.
           fetch-depth: 0
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
@@ -264,7 +284,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: "1"
           SSB64_VERSION: ${{ matrix.version }}
         run: bash scripts/package-linux.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: BattleShip-linux-${{ matrix.version }}
           path: dist/BattleShip${{ matrix.version == 'jp' && '-JP' || '' }}-x86_64.AppImage
@@ -291,13 +311,23 @@ jobs:
             artifact_name: BattleShip-android-armeabi-v7a
             apk_name: BattleShip-android-armeabi-v7a.apk
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           # Same as the other jobs — fetch-tags-aware history for the
           # BATTLESHIP_VERSION string the CMake derives from `git describe`.
           fetch-depth: 0
-      - uses: actions/setup-java@v4
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -307,7 +337,7 @@ jobs:
         # + png_to_c_array.py) needs PIL here too.
         run: sudo apt-get update && sudo apt-get install -y python3-pil
       - name: Install Android SDK + NDK r29
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           # Match android/app/build.gradle.kts: ndkVersion = "29.0.14206865"
           # and compileSdk = 34. ssb64-port has confirmed r29 + API 34
@@ -380,7 +410,7 @@ jobs:
           fi
           cp "${apk[0]}" "dist/${{ matrix.apk_name }}"
           ls -la dist/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: dist/${{ matrix.apk_name }}
@@ -403,19 +433,29 @@ jobs:
             artifact_name: BattleShip-windows-jp
             artifact_path: dist/BattleShip-JP-windows.zip
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           # fetch-depth: 0 grabs full history + all tags in one operation.
           # The built-in updater derives the version from `git describe
           # --tags` at configure time; checkout@v4's default shallow clone
           # omits tags. This used to be `fetch-tags: true`, but recent
-          # actions/checkout@v4 minor versions regressed on tag-triggered
+          # actions/checkout@v6 minor versions regressed on tag-triggered
           # workflows — the action tries to fetch BOTH the triggering
           # commit SHA AND refs/tags/<tag> and refuses with "Cannot fetch
           # both <sha> and refs/tags/<tag> to refs/tags/<tag>". Using
           # fetch-depth: 0 sidesteps the conflict.
           fetch-depth: 0
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
       - name: Install build deps
         # Windows runner ships with cmake / Visual Studio Build Tools
         # already. SDL2 comes from vcpkg, which is integrated by
@@ -435,7 +475,7 @@ jobs:
           SSB64_ENABLE_SCRIPTING: ${{ matrix.enable_scripting }}
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1
         shell: pwsh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
@@ -448,7 +488,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
@@ -472,7 +512,7 @@ jobs:
         with:
           subject-path: artifacts/SHA256SUMS.txt
       - name: Publish Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # Android: sideload APKs only (no Play Store distribution, so
           # the AAB is skipped). Android is US-only so there's no -JP.

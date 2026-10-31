@@ -37,12 +37,22 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           # The updater derives the version via `git describe --tags` at
           # configure time; a shallow clone omits tags and breaks configure.
           fetch-depth: 0
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
       - name: Install build deps
         # libultraship find_package set (libzip, nlohmann_json, tinyxml2,
         # spdlog, SDL2, GLEW). python3-pil: tools/generate_arrow_svg.py +
@@ -83,10 +93,20 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
       - name: Install build deps
         run: |
           brew install cmake ninja sdl2 glew libzip nlohmann-json tinyxml2 spdlog
@@ -106,10 +126,20 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Apply BattleShipDX patch to the decomp submodule
+        shell: bash
+        run: |
+          cd decomp
+          if [ -f src/sys/netlobby.c ]; then
+            echo "Patch already applied."
+          else
+            git apply --whitespace=nowarn ../patches/decomp-netplay.patch
+            echo "Patch applied."
+          fi
       - name: Install build deps
         # SDL2 comes from vcpkg, bootstrapped by libultraship's CMake. Pillow
         # for the unconditional CSS-arrow codegen.
